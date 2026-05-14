@@ -13,12 +13,22 @@ import org.springframework.stereotype.Component;
 public class MockMarketSignalProvider implements MarketSignalProvider {
 
     @Override
+    public String sourceType() {
+        return "marketplace_mock";
+    }
+
+    @Override
+    public String queryFor(Niche niche, Region region) {
+        return "mock:" + niche.code() + ":" + region.code();
+    }
+
+    @Override
     public MarketSignalBatch fetchSignals(Niche niche, Region region) {
         Instant observedAt = Instant.now();
 
         return new MarketSignalBatch(
-            "marketplace_mock",
-            "mock:" + niche.code() + ":" + region.code(),
+            sourceType(),
+            queryFor(niche, region),
             1320,
             List.of(
                 new MarketplaceProductSignal(
@@ -27,6 +37,7 @@ public class MockMarketSignalProvider implements MarketSignalProvider {
                     "Anime figure",
                     null,
                     null,
+                    "{\"source\":\"mock\",\"itemId\":\"mock-rimuru-figure\"}",
                     new BigDecimal("42.50"),
                     "CAD",
                     "New",
@@ -48,6 +59,7 @@ public class MockMarketSignalProvider implements MarketSignalProvider {
                     "Desk collectible",
                     null,
                     null,
+                    "{\"source\":\"mock\",\"itemId\":\"mock-anime-acrylic-stand\"}",
                     new BigDecimal("18.75"),
                     "CAD",
                     "New",
@@ -69,6 +81,7 @@ public class MockMarketSignalProvider implements MarketSignalProvider {
                     "Fitness accessory",
                     null,
                     null,
+                    "{\"source\":\"mock\",\"itemId\":\"mock-hydration-running-belt\"}",
                     new BigDecimal("31.20"),
                     "CAD",
                     "New",

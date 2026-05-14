@@ -10,6 +10,7 @@ public record MarketplaceProductSignal(
     String categoryName,
     String imageUrl,
     String itemWebUrl,
+    String rawJson,
     BigDecimal price,
     String currency,
     String condition,

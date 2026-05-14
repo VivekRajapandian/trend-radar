@@ -141,6 +141,13 @@ h1 {
   line-height: 1;
 }
 
+.generated-at {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .selector-row {
   display: flex;
   flex-wrap: wrap;

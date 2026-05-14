@@ -60,8 +60,7 @@ type OpportunitySnapshot = {
   generatedAt: string;
 };
 
-const OPPORTUNITIES_URL =
-  "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA";
+const OPPORTUNITIES_URL = "/api/opportunities?niche=anime_collectibles&region=CA";
 
 export default function Home() {
   const [opportunities, setOpportunities] = useState<OpportunitySnapshot[]>([]);
@@ -121,6 +120,12 @@ export default function Home() {
 
   const activeNiche = opportunities[0]?.niche.displayName ?? "Anime collectibles";
   const activeRegion = opportunities[0]?.region.displayName ?? "Canada";
+  const lastGeneratedAt = opportunities[0]?.generatedAt
+    ? new Intl.DateTimeFormat("en-CA", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(new Date(opportunities[0].generatedAt))
+    : "Waiting for first run";
 
   return (
     <main className="dashboard-shell">
@@ -149,6 +154,7 @@ export default function Home() {
           <div>
             <p className="eyebrow">Product intelligence</p>
             <h2>Opportunity signals for focused seller research.</h2>
+            <p className="generated-at">Generated at {lastGeneratedAt}</p>
           </div>
           <div className="selector-row" aria-label="Opportunity filters">
             <button className="selector-button" type="button">
@@ -271,7 +277,7 @@ export default function Home() {
                   <p className="eyebrow">Evidence summary</p>
                   <h3>Why these concepts surfaced</h3>
                 </div>
-                <span className="status-pill">Mock sources</span>
+                <span className="status-pill">Provider sources</span>
               </div>
 
               <div className="source-list">

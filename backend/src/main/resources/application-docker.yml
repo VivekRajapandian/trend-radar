@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: ${TREND_RADAR_DB_URL:jdbc:postgresql://trend-radar-db:5432/trend_radar}
+    username: ${TREND_RADAR_DB_USERNAME:trend_radar}
+    password: ${TREND_RADAR_DB_PASSWORD:trend_radar}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+trendradar:
+  ebay:
+    enabled: ${TREND_RADAR_EBAY_ENABLED:false}

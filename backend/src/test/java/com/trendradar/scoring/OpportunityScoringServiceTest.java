@@ -156,6 +156,7 @@ class OpportunityScoringServiceTest {
                 "Test category",
                 null,
                 null,
+                "{\"source\":\"test\"}",
                 price,
                 "CAD",
                 "New",

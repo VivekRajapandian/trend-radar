@@ -1,5 +1,7 @@
 package com.trendradar.infrastructure.ebay;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trendradar.domain.Niche;
 import com.trendradar.domain.Region;
 import com.trendradar.provider.MarketSignalBatch;
@@ -16,10 +18,16 @@ public class EbayMarketSignalProvider implements MarketSignalProvider {
 
     private final EbayProperties properties;
     private final EbayBrowseClient ebayBrowseClient;
+    private final ObjectMapper objectMapper;
 
-    public EbayMarketSignalProvider(EbayProperties properties, EbayBrowseClient ebayBrowseClient) {
+    public EbayMarketSignalProvider(
+        EbayProperties properties,
+        EbayBrowseClient ebayBrowseClient,
+        ObjectMapper objectMapper
+    ) {
         this.properties = properties;
         this.ebayBrowseClient = ebayBrowseClient;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -28,15 +36,25 @@ public class EbayMarketSignalProvider implements MarketSignalProvider {
     }
 
     @Override
+    public String sourceType() {
+        return "ebay_browse";
+    }
+
+    @Override
+    public String queryFor(Niche niche, Region region) {
+        return toSearchQuery(niche);
+    }
+
+    @Override
     public MarketSignalBatch fetchSignals(Niche niche, Region region) {
-        String query = toSearchQuery(niche);
+        String query = queryFor(niche, region);
         EbayBrowseClient.EbaySearchResponse response = ebayBrowseClient.search(query);
         List<EbayBrowseClient.EbayItemSummary> summaries = response == null || response.itemSummaries() == null
             ? List.of()
             : response.itemSummaries();
 
         return new MarketSignalBatch(
-            "ebay_browse",
+            sourceType(),
             query,
             response == null ? 0 : response.total(),
             summaries.stream()
@@ -56,6 +74,7 @@ public class EbayMarketSignalProvider implements MarketSignalProvider {
             category == null ? "Marketplace item" : category.categoryName(),
             item.image() == null ? null : item.image().imageUrl(),
             item.itemWebUrl(),
+            toRawJson(item),
             item.price() == null ? null : item.price().value(),
             item.price() == null ? null : item.price().currency(),
             item.condition(),
@@ -71,6 +90,14 @@ public class EbayMarketSignalProvider implements MarketSignalProvider {
             item.itemOriginDate(),
             item.itemCreationDate() == null ? Instant.now() : item.itemCreationDate()
         );
+    }
+
+    private String toRawJson(EbayBrowseClient.EbayItemSummary item) {
+        try {
+            return objectMapper.writeValueAsString(item);
+        } catch (JsonProcessingException exception) {
+            return "{\"serializationError\":\"%s\"}".formatted(exception.getMessage());
+        }
     }
 
     private java.math.BigDecimal firstShippingCost(EbayBrowseClient.EbayItemSummary item) {

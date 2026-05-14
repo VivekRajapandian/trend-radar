@@ -8,6 +8,10 @@ public interface MarketSignalProvider {
 
     MarketSignalBatch fetchSignals(Niche niche, Region region);
 
+    String sourceType();
+
+    String queryFor(Niche niche, Region region);
+
     default boolean isAvailable() {
         return true;
     }

@@ -23,4 +23,12 @@ public class OpportunityController {
     ) {
         return opportunityQueryService.findOpportunities(niche, region);
     }
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/opportunities/refresh")
+    public List<OpportunitySnapshot> refreshOpportunities(
+        @RequestParam(defaultValue = "anime_collectibles") String niche,
+        @RequestParam(defaultValue = "CA") String region
+    ) {
+        return opportunityQueryService.refreshOpportunities(niche, region);
+    }
 }

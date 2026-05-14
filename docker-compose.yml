@@ -1,0 +1,50 @@
+services:
+  trend-radar-db:
+    image: postgres:16-alpine
+    container_name: trend-radar-db
+    environment:
+      POSTGRES_DB: ${TREND_RADAR_DB_NAME:-trend_radar}
+      POSTGRES_USER: ${TREND_RADAR_DB_USERNAME:-trend_radar}
+      POSTGRES_PASSWORD: ${TREND_RADAR_DB_PASSWORD:-trend_radar}
+    ports:
+      - "5432:5432"
+    volumes:
+      - trend-radar-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trend_radar -d trend_radar"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  trend-radar-backend:
+    build:
+      context: ./backend
+    container_name: trend-radar-backend
+    depends_on:
+      trend-radar-db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      TREND_RADAR_DB_URL: jdbc:postgresql://trend-radar-db:5432/${TREND_RADAR_DB_NAME:-trend_radar}
+      TREND_RADAR_DB_USERNAME: ${TREND_RADAR_DB_USERNAME:-trend_radar}
+      TREND_RADAR_DB_PASSWORD: ${TREND_RADAR_DB_PASSWORD:-trend_radar}
+      TREND_RADAR_EBAY_ENABLED: ${TREND_RADAR_EBAY_ENABLED:-false}
+      TREND_RADAR_EBAY_USERNAME: ${TREND_RADAR_EBAY_USERNAME:-}
+      TREND_RADAR_EBAY_PASSWORD: ${TREND_RADAR_EBAY_PASSWORD:-}
+      TREND_RADAR_EBAY_MARKETPLACE_ID: ${TREND_RADAR_EBAY_MARKETPLACE_ID:-EBAY_CA}
+    ports:
+      - "8080:8080"
+
+  trend-radar-frontend:
+    build:
+      context: ./frontend
+    container_name: trend-radar-frontend
+    depends_on:
+      - trend-radar-backend
+    environment:
+      TREND_RADAR_API_BASE_URL: http://trend-radar-backend:8080
+    ports:
+      - "3000:3000"
+
+volumes:
+  trend-radar-postgres-data:
