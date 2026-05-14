@@ -1,27 +1,37 @@
-# Getting Started
+# TrendRadar — Product Intelligence Platform
 
-### Reference Documentation
-For further reference, please consider the following sections:
+## 1. Project Vision
 
-* [Official Gradle documentation](https://docs.gradle.org)
-* [Spring Boot Gradle Plugin Reference Guide](https://docs.spring.io/spring-boot/3.5.10/gradle-plugin)
-* [Create an OCI image](https://docs.spring.io/spring-boot/3.5.10/gradle-plugin/packaging-oci-image.html)
-* [Spring Web](https://docs.spring.io/spring-boot/3.5.10/reference/web/servlet.html)
-* [Spring Data JPA](https://docs.spring.io/spring-boot/3.5.10/reference/data/sql.html#data.sql.jpa-and-spring-data)
-* [Liquibase Migration](https://docs.spring.io/spring-boot/3.5.10/how-to/data-initialization.html#howto.data-initialization.migration-tool.liquibase)
-* [Validation](https://docs.spring.io/spring-boot/3.5.10/reference/io/validation.html)
+TrendRadar is a product opportunity intelligence platform for online sellers.
 
-### Guides
-The following guides illustrate how to use some features concretely:
+The platform helps sellers discover:
 
-* [Building a RESTful Web Service](https://spring.io/guides/gs/rest-service/)
-* [Serving Web Content with Spring MVC](https://spring.io/guides/gs/serving-web-content/)
-* [Building REST services with Spring](https://spring.io/guides/tutorials/rest/)
-* [Accessing Data with JPA](https://spring.io/guides/gs/accessing-data-jpa/)
-* [Validation](https://spring.io/guides/gs/validating-form-input/)
+- rising products
+- seasonal opportunities
+- high-demand product concepts
+- marketplace-validated products
+- potentially profitable niches
 
-### Additional Links
-These additional references should also help you:
+The system combines:
 
-* [Gradle Build Scans – insights for your project's build](https://scans.gradle.com#gradle)
+- marketplace proof
+- demand signals
+- social buzz
+- AI-generated reasoning
 
+to generate explainable product opportunity recommendations.
+
+---
+
+# 2. Core Product Goal
+
+The system should answer:
+
+> “What products are getting hot right now, why are they promising, and should a seller consider selling them?”
+
+This is not just a trend viewer.
+
+The product transforms:
+
+```text
+raw signals → normalized signals → scoring → explainable opportunities
