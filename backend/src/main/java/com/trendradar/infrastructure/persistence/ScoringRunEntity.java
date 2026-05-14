@@ -13,7 +13,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "scoring_run")
-public class ScoringRunEntity {
+public class ScoringRunEntity extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,6 +43,34 @@ public class ScoringRunEntity {
 
     public Long getId() {
         return id;
+    }
+
+    public ProviderRunEntity getProviderRun() {
+        return providerRun;
+    }
+
+    public String getScoringVersion() {
+        return scoringVersion;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
+    }
+
+    public int getOpportunitiesScored() {
+        return opportunitiesScored;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
     }
 
     public void setProviderRun(ProviderRunEntity providerRun) {

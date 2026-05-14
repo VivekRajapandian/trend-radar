@@ -1,17 +1,21 @@
 # TrendRadar
 
-TrendRadar is a product opportunity intelligence platform for online sellers. It turns marketplace signals into normalized, explainable product opportunity snapshots with scoring, evidence, and risk context.
+TrendRadar is a product opportunity intelligence platform for online sellers. It turns marketplace signals into normalized, explainable product opportunity snapshots with scoring, evidence, risk context, provider run history, and system visibility.
 
-The current implementation is a modular monolith backend, a Next.js dashboard, PostgreSQL persistence, Liquibase migrations, an optional eBay Browse provider, and a Docker Compose local stack.
+The current implementation is a modular monolith backend, a Next.js operational dashboard, PostgreSQL persistence, Liquibase migrations, an optional eBay Browse provider, a deterministic scoring engine, and a Docker Compose local stack.
 
 ## Features
 
 Currently implemented:
 
-- Premium Next.js dashboard shell for opportunity research.
+- Premium Next.js dashboard for opportunity research.
 - Normalized opportunity API consumed by the frontend.
 - Health endpoint for backend validation.
 - Manual opportunity refresh endpoint.
+- Provider run history API with pagination.
+- System status API with backend, database, storage, provider, and latest-run status.
+- Dashboard sections for system status, last refresh, and recent provider runs.
+- Dedicated Provider Runs and System Status pages.
 - Provider layer with optional eBay Browse API integration.
 - Mock marketplace provider fallback when eBay is disabled or missing credentials.
 - Normalization from provider signals into TrendRadar domain concepts.
@@ -22,9 +26,10 @@ Currently implemented:
   - seller quality
   - shipping risk
   - competition risk
-- Human-readable explanation text based on normalized evidence and risks.
+- Human-readable deterministic explanation text based on normalized evidence and risks.
 - PostgreSQL persistence for provider runs, raw source records, normalized signals, scoring runs, and opportunity snapshots.
-- Liquibase schema migrations.
+- Liquibase schema migrations with audit timestamps and query indexes.
+- Lightweight backend logging around refresh, provider execution, scoring, and persistence.
 - Docker Compose stack for PostgreSQL, Spring Boot backend, and Next.js frontend.
 
 Not implemented yet:
@@ -40,11 +45,11 @@ Not implemented yet:
 
 TrendRadar has three local runtime components:
 
-- **Frontend:** Next.js app on port `3000`. It renders opportunity cards, evidence summaries, risk badges, score badges, score breakdowns, loading states, and error states.
-- **Backend:** Spring Boot API on port `8080`. It owns provider orchestration, normalization, scoring, explanations, persistence, and normalized API responses.
+- **Frontend:** Next.js app on port `3000`. It renders opportunity cards, score breakdowns, system status, recent provider runs, Provider Runs, and System Status views.
+- **Backend:** Spring Boot API on port `8080`. It owns provider orchestration, normalization, scoring, explanations, persistence, provider run history, and system status responses.
 - **Database:** PostgreSQL on port `5432`. Liquibase creates and updates the schema automatically when the backend starts.
 
-The frontend calls a Next.js API proxy at `/api/opportunities`. The proxy forwards requests to the backend using `TREND_RADAR_API_BASE_URL`, which is `http://trend-radar-backend:8080` inside Docker and defaults to `http://localhost:8080` for local non-Docker development.
+The frontend uses Next.js API proxy routes for browser-safe and container-safe calls. The proxy uses `TREND_RADAR_API_BASE_URL`, which is `http://trend-radar-backend:8080` inside Docker and defaults to `http://localhost:8080` for non-Docker local development.
 
 ## Current System Design
 
@@ -54,7 +59,8 @@ The backend is organized as a modular monolith:
 - **Normalization layer:** Converts provider-shaped marketplace signals into normalized `OpportunitySnapshot` domain responses.
 - **Scoring layer:** Calculates explainable score components and final score labels: `High`, `Promising`, `Watch`, or `Weak`.
 - **Explanation layer:** Generates deterministic text explanations from marketplace evidence and risks.
-- **Persistence layer:** Stores provider execution metadata, raw source JSON, normalized signals, scoring metadata, and final opportunity snapshots.
+- **Persistence layer:** Stores provider execution metadata, raw source JSON, normalized signals, scoring metadata, final opportunity snapshots, and audit timestamps.
+- **Observability layer:** Exposes provider run history and aggregate system status from persisted runs, scoring records, source records, snapshots, provider availability, and database connectivity.
 - **API layer:** Exposes normalized TrendRadar APIs only. eBay-shaped models are not exposed to the frontend.
 
 `GET /api/opportunities` returns the latest persisted snapshots for the requested niche and region. If none exist, it performs a refresh, persists the results, and returns normalized opportunities.
@@ -80,7 +86,7 @@ trend-radar/
     pom.xml
     src/main/java/com/trendradar/
       api/                 REST controllers
-      application/         use-case orchestration
+      application/         use-case orchestration and query services
       domain/              normalized TrendRadar domain records
       explanation/         deterministic explanation generation
       health/              health endpoint
@@ -97,16 +103,19 @@ trend-radar/
   frontend/
     Dockerfile
     app/
-      api/opportunities/   Next.js API proxy to backend
-      page.tsx             dashboard UI
-      globals.css          dashboard styling
-    next.config.ts
+      api/opportunities/   Next.js proxy to backend opportunities API
+      api/provider-runs/   Next.js proxy to backend provider run APIs
+      api/system/status/   Next.js proxy to backend system status API
+      provider-runs/       provider run history page
+      system-status/       system status page
+      page.tsx             main dashboard UI
+      globals.css          dashboard and operations styling
   docker-compose.yml
   docs/
     PROJECT_BRIEF.md
 ```
 
-## Running Locally (Non-Docker)
+## Running Locally Non-Docker
 
 Prerequisites:
 
@@ -272,8 +281,6 @@ Secrets should stay in local environment variables or ignored `.env` files. Do n
 GET /api/health
 ```
 
-Sample:
-
 ```powershell
 Invoke-RestMethod "http://localhost:8080/api/health"
 ```
@@ -292,8 +299,6 @@ Expected:
 GET /api/opportunities?niche=anime_collectibles&region=CA
 ```
 
-Sample:
-
 ```powershell
 Invoke-RestMethod "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA"
 ```
@@ -310,8 +315,6 @@ Behavior:
 POST /api/opportunities/refresh?niche=anime_collectibles&region=CA
 ```
 
-Sample:
-
 ```powershell
 Invoke-RestMethod -Method Post "http://localhost:8080/api/opportunities/refresh?niche=anime_collectibles&region=CA"
 ```
@@ -324,15 +327,46 @@ Behavior:
 - Persists raw source records, normalized signals, scoring run metadata, and opportunity snapshots.
 - Returns normalized opportunities.
 
-### Frontend Proxy
+### Provider Runs
+
+```http
+GET /api/provider-runs?page=0&size=20
+GET /api/provider-runs/{id}
+```
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/provider-runs?page=0&size=20"
+Invoke-RestMethod "http://localhost:8080/api/provider-runs/1"
+```
+
+The list endpoint returns newest runs first and includes pagination metadata.
+
+### System Status
+
+```http
+GET /api/system/status
+```
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/system/status"
+```
+
+The response includes backend status, database connectivity, latest provider run, latest scoring run, stored opportunity/source record counts, active providers, and generation timestamp.
+
+### Frontend Proxy Routes
+
+These routes are served by Next.js and forwarded to the backend:
 
 ```http
 GET /api/opportunities?niche=anime_collectibles&region=CA
+GET /api/provider-runs?page=0&size=20
+GET /api/provider-runs/{id}
+GET /api/system/status
 ```
 
-From the frontend app, this route is served by Next.js and forwards to the backend. It is useful for browser-safe and container-safe API access.
+## Response Shapes
 
-## Opportunity Response Shape
+### Opportunity
 
 The frontend consumes normalized TrendRadar data, not eBay-shaped data.
 
@@ -390,6 +424,56 @@ The frontend consumes normalized TrendRadar data, not eBay-shaped data.
 ]
 ```
 
+### Provider Run Page
+
+```json
+{
+  "runs": [
+    {
+      "id": 1,
+      "provider": "marketplace_mock",
+      "source": "marketplace_mock",
+      "niche": "anime_collectibles",
+      "region": "CA",
+      "query": "anime collectibles Canada",
+      "status": "COMPLETED",
+      "startedAt": "2026-05-14T12:00:00Z",
+      "completedAt": "2026-05-14T12:00:01Z",
+      "durationMs": 1000,
+      "recordsFetched": 3,
+      "opportunitiesGenerated": 3,
+      "scoringVersion": "v1",
+      "errorMessage": null,
+      "createdAt": "2026-05-14T12:00:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+### System Status
+
+```json
+{
+  "backendStatus": "OK",
+  "dbConnectivity": "OK",
+  "latestProviderRun": {},
+  "latestScoringRun": {},
+  "totalOpportunitiesStored": 3,
+  "totalSourceRecordsStored": 3,
+  "activeProviders": [
+    {
+      "sourceType": "marketplace_mock",
+      "available": true
+    }
+  ],
+  "generatedAt": "2026-05-14T12:00:00Z"
+}
+```
+
 ## Manual Validation
 
 ### Confirm Backend Works
@@ -416,7 +500,19 @@ Confirm the dashboard renders:
 - score breakdown rows
 - evidence summary
 - risk badges
-- `Generated at` text
+- generated-at text
+- System Status card
+- Last Refresh summary
+- Recent Provider Runs table
+
+Then open:
+
+```text
+http://localhost:3000/provider-runs
+http://localhost:3000/system-status
+```
+
+Confirm each page loads with operational data instead of an error state.
 
 ### Confirm DB Connectivity
 
@@ -443,7 +539,68 @@ SELECT COUNT(*) FROM scoring_run;
 SELECT COUNT(*) FROM opportunity_snapshot;
 ```
 
-`databasechangelog` should contain 5 applied changesets. The other tables should receive rows after calling the opportunities or refresh endpoint.
+`databasechangelog` should contain 7 applied changesets. The other tables should receive rows after calling the opportunities or refresh endpoint.
+
+### Confirm Provider Run History
+
+Create a run:
+
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8080/api/opportunities/refresh?niche=anime_collectibles&region=CA"
+```
+
+Read run history:
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/provider-runs?page=0&size=10" | ConvertTo-Json -Depth 6
+```
+
+Confirm the latest run includes:
+
+- `id`
+- `provider`
+- `source`
+- `niche`
+- `region`
+- `query`
+- `status`
+- `startedAt`
+- `completedAt`
+- `durationMs`
+- `recordsFetched`
+- `opportunitiesGenerated`
+- `scoringVersion`
+- `createdAt`
+
+Confirm provider and scoring linkage in the database:
+
+```sql
+SELECT pr.id,
+       pr.source_type,
+       pr.status,
+       sr.id AS scoring_run_id,
+       sr.scoring_version,
+       sr.opportunities_scored
+FROM provider_run pr
+LEFT JOIN scoring_run sr ON sr.provider_run_id = pr.id
+ORDER BY pr.id DESC;
+```
+
+### Confirm System Status
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/system/status" | ConvertTo-Json -Depth 6
+```
+
+Confirm:
+
+- `backendStatus` is `OK`
+- `dbConnectivity` is `OK`
+- `latestProviderRun` is present after a refresh
+- `latestScoringRun` is present after a refresh
+- `totalOpportunitiesStored` increases or remains nonzero after opportunities are generated
+- `totalSourceRecordsStored` increases or remains nonzero after provider records are stored
+- `activeProviders` includes `marketplace_mock` and, when configured, eBay provider information
 
 ### Confirm eBay Integration
 
@@ -474,8 +631,6 @@ Successful eBay runs should show `source_type = 'ebay_browse'`. If eBay is disab
 
 ### Confirm Scoring Works
 
-Call:
-
 ```powershell
 Invoke-RestMethod "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA" | ConvertTo-Json -Depth 6
 ```
@@ -491,7 +646,7 @@ Confirm each opportunity includes:
 - `finalScore`
 - `scoreLabel`
 
-The frontend also displays these fields in each card's `Score Breakdown` section.
+The frontend displays these fields in each opportunity card's `Score Breakdown` section.
 
 ### Confirm Docker Setup Works
 
@@ -507,12 +662,16 @@ In another terminal:
 docker compose ps
 Invoke-RestMethod "http://localhost:8080/api/health"
 Invoke-RestMethod "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA"
+Invoke-RestMethod "http://localhost:8080/api/provider-runs?page=0&size=5"
+Invoke-RestMethod "http://localhost:8080/api/system/status"
 ```
 
 Open:
 
 ```text
 http://localhost:3000
+http://localhost:3000/provider-runs
+http://localhost:3000/system-status
 ```
 
 Confirm backend logs show Liquibase:
@@ -522,6 +681,14 @@ docker compose logs trend-radar-backend
 ```
 
 Look for messages like `Liquibase: Update has been successful` and `Tomcat started on port 8080`.
+
+## Screenshots
+
+Placeholders for project documentation:
+
+- Dashboard: `docs/screenshots/dashboard.png`
+- Provider Runs: `docs/screenshots/provider-runs.png`
+- System Status: `docs/screenshots/system-status.png`
 
 ## Tests And Build Checks
 
@@ -547,7 +714,7 @@ docker compose config
 
 ## Current Milestone Status
 
-Implemented through Milestone 5.1:
+Implemented through Milestone 6:
 
 - Milestone 1: initial Spring Boot backend, Next.js frontend, health endpoint, dashboard shell.
 - Milestone 2: normalized opportunity API with mocked data.
@@ -555,6 +722,7 @@ Implemented through Milestone 5.1:
 - Milestone 4: Opportunity Scoring Engine v1 with score breakdowns and frontend display.
 - Milestone 5: PostgreSQL persistence, Liquibase migrations, provider/scoring run tracking, raw source records, normalized signals, opportunity snapshots.
 - Milestone 5.1: Dockerized local development with one-command startup.
+- Milestone 6: provider run history APIs, system status API, operational dashboard sections, Provider Runs page, System Status page, audit timestamps, indexes, and observability tests.
 
 ## Next Planned Milestones
 
@@ -563,7 +731,6 @@ Planned, not yet implemented:
 - OpenAI-powered explanation layer for richer opportunity reasoning.
 - Google Trends or another demand provider.
 - Scheduled ingestion and refresh cadence.
-- Provider run history UI.
 - Alerts, watchlists, or saved opportunities.
 - Authentication and user-specific workspaces.
 - More robust production configuration and deployment packaging.
@@ -587,8 +754,14 @@ docker compose down -v
 docker compose up --build
 ```
 
-If the frontend cannot load opportunities:
+If the frontend cannot load opportunities or operations data:
 
 - Confirm the backend health endpoint works.
 - Confirm `TREND_RADAR_API_BASE_URL` is set to `http://trend-radar-backend:8080` in Docker.
-- Confirm the Next.js proxy route responds at `http://localhost:3000/api/opportunities?niche=anime_collectibles&region=CA`.
+- Confirm these Next.js proxy routes respond:
+
+```powershell
+Invoke-RestMethod "http://localhost:3000/api/opportunities?niche=anime_collectibles&region=CA"
+Invoke-RestMethod "http://localhost:3000/api/provider-runs?page=0&size=5"
+Invoke-RestMethod "http://localhost:3000/api/system/status"
+```

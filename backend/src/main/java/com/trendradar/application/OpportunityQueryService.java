@@ -50,6 +50,7 @@ public class OpportunityQueryService {
 
     @Transactional
     public List<OpportunitySnapshot> refreshOpportunities(String nicheCode, String regionCode) {
+        LOGGER.info("Refresh requested for niche {} and region {}", nicheCode, regionCode);
         Niche niche = Niche.fromCode(nicheCode);
         Region region = Region.fromCode(regionCode);
         ProviderRunResult providerRunResult = fetchFirstAvailableSignalBatch(niche, region);
@@ -70,9 +71,19 @@ public class OpportunityQueryService {
         ScoringRunEntity scoringRun = opportunityPersistenceService.startScoringRun(providerRunResult.providerRun());
 
         try {
+            LOGGER.info(
+                "Scoring provider run {} with {} normalized product signals",
+                providerRunResult.providerRun().getId(),
+                signalBatch.products().size()
+            );
             List<OpportunitySnapshot> opportunities = opportunityNormalizer.normalize(signalBatch, niche, region);
             opportunityPersistenceService.saveOpportunitySnapshots(providerRunResult.providerRun(), scoringRun, opportunities);
             opportunityPersistenceService.completeScoringRun(scoringRun, opportunities.size());
+            LOGGER.info(
+                "Refresh completed for provider run {} with {} opportunities",
+                providerRunResult.providerRun().getId(),
+                opportunities.size()
+            );
 
             return opportunities;
         } catch (RuntimeException exception) {
@@ -95,10 +106,22 @@ public class OpportunityQueryService {
             );
 
             try {
+                LOGGER.info(
+                    "Executing provider {} for niche {} and region {}",
+                    marketSignalProvider.sourceType(),
+                    niche.code(),
+                    region.code()
+                );
                 MarketSignalBatch signalBatch = marketSignalProvider.fetchSignals(niche, region);
                 opportunityPersistenceService.completeProviderRun(providerRun, signalBatch);
 
                 if (!signalBatch.products().isEmpty()) {
+                    LOGGER.info(
+                        "Provider {} completed run {} with {} records",
+                        marketSignalProvider.sourceType(),
+                        providerRun.getId(),
+                        signalBatch.products().size()
+                    );
                     return new ProviderRunResult(providerRun, signalBatch);
                 }
             } catch (RuntimeException exception) {

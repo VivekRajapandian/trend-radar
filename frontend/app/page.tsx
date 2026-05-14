@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatDateTime, formatDuration } from "./format";
+import type { ProviderRun, ProviderRunPage, SystemStatus } from "./types";
 
 type ProductConcept = {
   id: string;
@@ -61,9 +63,13 @@ type OpportunitySnapshot = {
 };
 
 const OPPORTUNITIES_URL = "/api/opportunities?niche=anime_collectibles&region=CA";
+const PROVIDER_RUNS_URL = "/api/provider-runs?size=5";
+const SYSTEM_STATUS_URL = "/api/system/status";
 
 export default function Home() {
   const [opportunities, setOpportunities] = useState<OpportunitySnapshot[]>([]);
+  const [providerRuns, setProviderRuns] = useState<ProviderRun[]>([]);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,9 +81,11 @@ export default function Home() {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(OPPORTUNITIES_URL, {
-          signal: controller.signal
-        });
+        const [response, providerRunsResponse, systemStatusResponse] = await Promise.all([
+          fetch(OPPORTUNITIES_URL, { signal: controller.signal }),
+          fetch(PROVIDER_RUNS_URL, { signal: controller.signal }),
+          fetch(SYSTEM_STATUS_URL, { signal: controller.signal })
+        ]);
 
         if (!response.ok) {
           throw new Error(`Backend returned ${response.status}`);
@@ -85,6 +93,15 @@ export default function Home() {
 
         const data = (await response.json()) as OpportunitySnapshot[];
         setOpportunities(data);
+
+        if (providerRunsResponse.ok) {
+          const providerRunPage = (await providerRunsResponse.json()) as ProviderRunPage;
+          setProviderRuns(providerRunPage.runs);
+        }
+
+        if (systemStatusResponse.ok) {
+          setSystemStatus((await systemStatusResponse.json()) as SystemStatus);
+        }
       } catch (caughtError) {
         if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
           return;
@@ -138,10 +155,11 @@ export default function Home() {
           </div>
         </div>
         <nav className="nav-list" aria-label="Primary navigation">
-          <a className="active" href="#">Radar</a>
+          <a className="active" href="/">Dashboard</a>
           <a href="#">Signals</a>
           <a href="#">Opportunities</a>
-          <a href="#">Providers</a>
+          <a href="/provider-runs">Provider Runs</a>
+          <a href="/system-status">System Status</a>
         </nav>
         <div className="sidebar-note">
           <span>Normalized API</span>
@@ -179,6 +197,54 @@ export default function Home() {
             </article>
           ))}
         </section>
+
+        {!isLoading && !error ? (
+          <section className="ops-grid" aria-label="Operational summary">
+            <article className="ops-card">
+              <p className="eyebrow">System Status</p>
+              <h3>{systemStatus?.backendStatus ?? "Unknown"}</h3>
+              <div className="ops-metadata">
+                <span>Database</span>
+                <strong>{systemStatus?.dbConnectivity ?? "-"}</strong>
+              </div>
+              <div className="ops-metadata">
+                <span>Opportunities stored</span>
+                <strong>{systemStatus?.totalOpportunitiesStored ?? "-"}</strong>
+              </div>
+            </article>
+            <article className="ops-card">
+              <p className="eyebrow">Last Refresh</p>
+              <h3>{systemStatus?.latestProviderRun?.status ?? "No runs yet"}</h3>
+              <div className="ops-metadata">
+                <span>Provider</span>
+                <strong>{systemStatus?.latestProviderRun?.source ?? "-"}</strong>
+              </div>
+              <div className="ops-metadata">
+                <span>Completed</span>
+                <strong>{formatDateTime(systemStatus?.latestProviderRun?.completedAt)}</strong>
+              </div>
+            </article>
+            <article className="ops-card wide">
+              <div className="panel-heading compact">
+                <div>
+                  <p className="eyebrow">Recent Provider Runs</p>
+                  <h3>Execution history</h3>
+                </div>
+                <a className="text-link" href="/provider-runs">View all</a>
+              </div>
+              <div className="compact-table">
+                {providerRuns.slice(0, 4).map((run) => (
+                  <div className="run-row" key={run.id}>
+                    <span className={`status-badge ${run.status.toLowerCase()}`}>{run.status}</span>
+                    <strong>{run.source}</strong>
+                    <span>{run.recordsFetched} records</span>
+                    <span>{formatDuration(run.durationMs)}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
+        ) : null}
 
         {isLoading ? (
           <section className="state-panel" aria-live="polite">

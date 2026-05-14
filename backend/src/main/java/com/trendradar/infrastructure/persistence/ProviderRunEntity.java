@@ -10,7 +10,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "provider_run")
-public class ProviderRunEntity {
+public class ProviderRunEntity extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

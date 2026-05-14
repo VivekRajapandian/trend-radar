@@ -13,7 +13,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "source_record")
-public class SourceRecordEntity {
+public class SourceRecordEntity extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

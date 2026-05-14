@@ -15,10 +15,14 @@ import com.trendradar.provider.MarketplaceProductSignal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class OpportunityPersistenceService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpportunityPersistenceService.class);
 
     private static final TypeReference<List<SourceEvidence>> SOURCE_EVIDENCE_LIST = new TypeReference<>() {
     };
@@ -72,7 +76,10 @@ public class OpportunityPersistenceService {
         providerRun.setStartedAt(Instant.now());
         providerRun.setRecordsFetched(0);
 
-        return providerRunRepository.save(providerRun);
+        ProviderRunEntity savedProviderRun = providerRunRepository.save(providerRun);
+        LOGGER.info("Started provider run {} for source {} and query {}", savedProviderRun.getId(), sourceType, query);
+
+        return savedProviderRun;
     }
 
     public void completeProviderRun(ProviderRunEntity providerRun, MarketSignalBatch signalBatch) {
@@ -82,6 +89,7 @@ public class OpportunityPersistenceService {
         providerRun.setCompletedAt(Instant.now());
         providerRun.setRecordsFetched(signalBatch.products().size());
         providerRunRepository.save(providerRun);
+        LOGGER.info("Completed provider run {} with {} records", providerRun.getId(), signalBatch.products().size());
     }
 
     public void failProviderRun(ProviderRunEntity providerRun, RuntimeException exception) {
@@ -89,6 +97,7 @@ public class OpportunityPersistenceService {
         providerRun.setCompletedAt(Instant.now());
         providerRun.setErrorMessage(exception.getMessage());
         providerRunRepository.save(providerRun);
+        LOGGER.warn("Provider run {} failed: {}", providerRun.getId(), exception.getMessage());
     }
 
     public List<SourceRecordEntity> saveSourceRecords(ProviderRunEntity providerRun, MarketSignalBatch signalBatch) {
@@ -96,7 +105,10 @@ public class OpportunityPersistenceService {
             .map(product -> toSourceRecord(providerRun, signalBatch, product))
             .toList();
 
-        return sourceRecordRepository.saveAll(records);
+        List<SourceRecordEntity> savedRecords = sourceRecordRepository.saveAll(records);
+        LOGGER.info("Persisted {} source records for provider run {}", savedRecords.size(), providerRun.getId());
+
+        return savedRecords;
     }
 
     public void saveNormalizedSignals(
@@ -120,6 +132,7 @@ public class OpportunityPersistenceService {
         }
 
         normalizedSignalRepository.saveAll(normalizedSignals);
+        LOGGER.info("Persisted {} normalized signals for provider run {}", normalizedSignals.size(), providerRun.getId());
     }
 
     public ScoringRunEntity startScoringRun(ProviderRunEntity providerRun) {
@@ -130,7 +143,10 @@ public class OpportunityPersistenceService {
         scoringRun.setStartedAt(Instant.now());
         scoringRun.setOpportunitiesScored(0);
 
-        return scoringRunRepository.save(scoringRun);
+        ScoringRunEntity savedScoringRun = scoringRunRepository.save(scoringRun);
+        LOGGER.info("Started scoring run {} for provider run {}", savedScoringRun.getId(), providerRun.getId());
+
+        return savedScoringRun;
     }
 
     public void completeScoringRun(ScoringRunEntity scoringRun, int opportunitiesScored) {
@@ -138,6 +154,7 @@ public class OpportunityPersistenceService {
         scoringRun.setCompletedAt(Instant.now());
         scoringRun.setOpportunitiesScored(opportunitiesScored);
         scoringRunRepository.save(scoringRun);
+        LOGGER.info("Completed scoring run {} with {} opportunities", scoringRun.getId(), opportunitiesScored);
     }
 
     public void failScoringRun(ScoringRunEntity scoringRun, RuntimeException exception) {
@@ -145,6 +162,7 @@ public class OpportunityPersistenceService {
         scoringRun.setCompletedAt(Instant.now());
         scoringRun.setErrorMessage(exception.getMessage());
         scoringRunRepository.save(scoringRun);
+        LOGGER.warn("Scoring run {} failed: {}", scoringRun.getId(), exception.getMessage());
     }
 
     public void saveOpportunitySnapshots(
@@ -157,6 +175,7 @@ public class OpportunityPersistenceService {
                 .map(snapshot -> toOpportunitySnapshotEntity(providerRun, scoringRun, snapshot))
                 .toList()
         );
+        LOGGER.info("Persisted {} opportunity snapshots for scoring run {}", snapshots.size(), scoringRun.getId());
     }
 
     private SourceRecordEntity toSourceRecord(

@@ -414,3 +414,114 @@ databaseChangeLog:
                   name: region_code
               - column:
                   name: generated_at
+
+  - changeSet:
+      id: 006-add-audit-timestamps
+      author: trendradar
+      changes:
+        - addColumn:
+            tableName: provider_run
+            columns:
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: source_record
+            columns:
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: normalized_signal
+            columns:
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: scoring_run
+            columns:
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: opportunity_snapshot
+            columns:
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: 007-add-observability-indexes
+      author: trendradar
+      changes:
+        - createIndex:
+            tableName: provider_run
+            indexName: idx_provider_run_started_at
+            columns:
+              - column:
+                  name: started_at
+        - createIndex:
+            tableName: provider_run
+            indexName: idx_provider_run_status_started_at
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: started_at
+        - createIndex:
+            tableName: scoring_run
+            indexName: idx_scoring_run_started_at
+            columns:
+              - column:
+                  name: started_at
+        - createIndex:
+            tableName: source_record
+            indexName: idx_source_record_provider_run
+            columns:
+              - column:
+                  name: provider_run_id

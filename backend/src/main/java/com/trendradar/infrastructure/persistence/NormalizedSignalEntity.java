@@ -14,7 +14,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "normalized_signal")
-public class NormalizedSignalEntity {
+public class NormalizedSignalEntity extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -14,7 +14,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "opportunity_snapshot")
-public class OpportunitySnapshotEntity {
+public class OpportunitySnapshotEntity extends AuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
