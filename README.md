@@ -256,8 +256,6 @@ Docker Compose variables:
 | `TREND_RADAR_EBAY_PASSWORD` | empty | Passed to backend container. |
 | `TREND_RADAR_EBAY_MARKETPLACE_ID` | `EBAY_CA` | Passed to backend container. |
 
-The current Docker healthcheck uses the default database and username (`trend_radar`). Keep those defaults for the easiest local startup, or update the healthcheck in `docker-compose.yml` if you change them.
-
 Frontend variable:
 
 | Variable | Default | Purpose |
