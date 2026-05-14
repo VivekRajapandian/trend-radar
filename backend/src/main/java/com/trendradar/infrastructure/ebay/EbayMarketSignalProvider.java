@@ -61,11 +61,34 @@ public class EbayMarketSignalProvider implements MarketSignalProvider {
             item.condition(),
             item.seller() == null ? null : item.seller().username(),
             item.seller() == null ? null : item.seller().feedbackPercentage(),
+            item.seller() == null ? null : item.seller().feedbackScore(),
             item.itemLocation() == null ? null : item.itemLocation().country(),
+            firstShippingCost(item),
+            firstShippingCostType(item),
+            item.buyingOptions() == null ? List.of() : item.buyingOptions(),
             item.topRatedBuyingExperience(),
             item.priorityListing(),
+            item.itemOriginDate(),
             item.itemCreationDate() == null ? Instant.now() : item.itemCreationDate()
         );
+    }
+
+    private java.math.BigDecimal firstShippingCost(EbayBrowseClient.EbayItemSummary item) {
+        if (item.shippingOptions() == null || item.shippingOptions().isEmpty()) {
+            return null;
+        }
+
+        EbayBrowseClient.EbayShippingOption option = item.shippingOptions().get(0);
+
+        return option.shippingCost() == null ? null : option.shippingCost().value();
+    }
+
+    private String firstShippingCostType(EbayBrowseClient.EbayItemSummary item) {
+        if (item.shippingOptions() == null || item.shippingOptions().isEmpty()) {
+            return null;
+        }
+
+        return item.shippingOptions().get(0).shippingCostType();
     }
 
     private String toSearchQuery(Niche niche) {

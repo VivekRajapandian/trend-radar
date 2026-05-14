@@ -51,6 +51,8 @@ public class MarketplaceOpportunityNormalizer implements OpportunityNormalizer {
             signalBatch.totalMatches(),
             signalBatch.products().size(),
             product.price() == null ? BigDecimal.ZERO : product.price(),
+            minPrice(signalBatch.products()),
+            maxPrice(signalBatch.products()),
             buildDemandSignal(signalBatch, product)
         );
         List<RiskSignal> risks = buildRisks(product, niche);
@@ -68,6 +70,13 @@ public class MarketplaceOpportunityNormalizer implements OpportunityNormalizer {
             region,
             score.value(),
             score.label(),
+            score.marketplaceProofScore(),
+            score.priceViabilityScore(),
+            score.freshnessScore(),
+            score.sellerQualityScore(),
+            score.shippingRiskScore(),
+            score.competitionRiskScore(),
+            score.finalScore(),
             marketplaceEvidence,
             List.of(
                 new SourceEvidence(
@@ -123,5 +132,21 @@ public class MarketplaceOpportunityNormalizer implements OpportunityNormalizer {
         }
 
         return String.join(" ", java.util.Arrays.copyOfRange(words, 0, 5));
+    }
+
+    private BigDecimal minPrice(List<MarketplaceProductSignal> products) {
+        return products.stream()
+            .map(MarketplaceProductSignal::price)
+            .filter(price -> price != null && price.signum() > 0)
+            .min(java.util.Comparator.naturalOrder())
+            .orElse(BigDecimal.ZERO);
+    }
+
+    private BigDecimal maxPrice(List<MarketplaceProductSignal> products) {
+        return products.stream()
+            .map(MarketplaceProductSignal::price)
+            .filter(price -> price != null && price.signum() > 0)
+            .max(java.util.Comparator.naturalOrder())
+            .orElse(BigDecimal.ZERO);
     }
 }

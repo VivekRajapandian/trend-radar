@@ -22,6 +22,8 @@ type MarketplaceEvidence = {
   estimatedSoldCount: number;
   activeListings: number;
   medianPrice: number;
+  minPrice: number;
+  maxPrice: number;
   demandSignal: string;
 };
 
@@ -44,6 +46,13 @@ type OpportunitySnapshot = {
   region: Region;
   score: number;
   scoreLabel: string;
+  marketplaceProofScore: number;
+  priceViabilityScore: number;
+  freshnessScore: number;
+  sellerQualityScore: number;
+  shippingRiskScore: number;
+  competitionRiskScore: number;
+  finalScore: number;
   marketplaceEvidence: MarketplaceEvidence;
   sourceEvidence: SourceEvidence[];
   risks: RiskSignal[];
@@ -105,7 +114,7 @@ export default function Home() {
 
     return [
       { label: "Top Score", value: topScore ? String(topScore) : "-", detail: "normalized", tone: "strong" },
-      { label: "Opportunities", value: String(opportunities.length), detail: "mocked", tone: "cool" },
+      { label: "Opportunities", value: String(opportunities.length), detail: "ranked", tone: "cool" },
       { label: "Risk Signals", value: String(riskCount), detail: "review", tone: "warm" }
     ];
   }, [opportunities]);
@@ -197,7 +206,7 @@ export default function Home() {
                         <h4>{opportunity.productConcept.name}</h4>
                       </div>
                       <div className="score-badge">
-                        <strong>{opportunity.score}</strong>
+                        <strong>{opportunity.finalScore}</strong>
                         <span>{opportunity.scoreLabel}</span>
                       </div>
                     </div>
@@ -218,6 +227,31 @@ export default function Home() {
                         <strong>${Number(opportunity.marketplaceEvidence.medianPrice).toFixed(2)}</strong>
                       </div>
                     </div>
+
+                    <section className="score-breakdown" aria-label={`${opportunity.productConcept.name} score breakdown`}>
+                      <div className="breakdown-heading">
+                        <strong>Score Breakdown</strong>
+                        <span>Final {opportunity.finalScore}</span>
+                      </div>
+                      <div className="breakdown-grid">
+                        {([
+                          ["Marketplace proof", opportunity.marketplaceProofScore],
+                          ["Price viability", opportunity.priceViabilityScore],
+                          ["Freshness", opportunity.freshnessScore],
+                          ["Seller quality", opportunity.sellerQualityScore],
+                          ["Shipping risk", opportunity.shippingRiskScore],
+                          ["Competition risk", opportunity.competitionRiskScore]
+                        ] as Array<[string, number]>).map(([label, value]) => (
+                          <div className="breakdown-row" key={label}>
+                            <span>{label}</span>
+                            <div>
+                              <i style={{ width: `${value}%` }} />
+                            </div>
+                            <strong>{value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
 
                     <div className="risk-row" aria-label={`${opportunity.productConcept.name} risk signals`}>
                       {opportunity.risks.map((risk) => (

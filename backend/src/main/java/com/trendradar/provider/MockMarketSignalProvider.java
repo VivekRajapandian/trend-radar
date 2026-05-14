@@ -32,9 +32,14 @@ public class MockMarketSignalProvider implements MarketSignalProvider {
                     "New",
                     "mock.collectibles",
                     "99.8",
+                    4200,
                     "CA",
+                    BigDecimal.ZERO,
+                    "FIXED",
+                    List.of("FIXED_PRICE", "BEST_OFFER"),
                     true,
                     false,
+                    observedAt.minusSeconds(24L * 60L * 60L),
                     observedAt
                 ),
                 new MarketplaceProductSignal(
@@ -48,9 +53,14 @@ public class MockMarketSignalProvider implements MarketSignalProvider {
                     "New",
                     "mock.anime.goods",
                     "99.1",
+                    920,
                     "CA",
+                    new BigDecimal("6.95"),
+                    "FIXED",
+                    List.of("FIXED_PRICE"),
                     true,
                     false,
+                    observedAt.minusSeconds(18L * 24L * 60L * 60L),
                     observedAt
                 ),
                 new MarketplaceProductSignal(
@@ -64,9 +74,14 @@ public class MockMarketSignalProvider implements MarketSignalProvider {
                     "New",
                     "mock.active.store",
                     "98.7",
+                    310,
                     "US",
+                    new BigDecimal("14.50"),
+                    "CALCULATED",
+                    List.of("FIXED_PRICE"),
                     false,
                     false,
+                    observedAt.minusSeconds(110L * 24L * 60L * 60L),
                     observedAt
                 )
             )

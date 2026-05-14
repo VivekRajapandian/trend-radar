@@ -7,7 +7,7 @@ This repository is a monorepo with:
 - `backend`: Spring Boot API
 - `frontend`: Next.js dashboard
 
-Milestone 3 adds the first real marketplace provider boundary with an eBay Browse API adapter. The frontend still consumes only normalized TrendRadar opportunity snapshots. No database, OpenAI, Google Trends, or committed secrets are included.
+Milestone 4 adds Opportunity Scoring Engine v1. The backend still exposes normalized TrendRadar opportunity snapshots, and the frontend still consumes that normalized contract. No database, OpenAI, Google Trends, scheduled ingestion, auth, or committed secrets are included.
 
 ## Prerequisites
 
@@ -39,16 +39,10 @@ TREND_RADAR_EBAY_MARKETPLACE_ID=EBAY_CA
 
 ```powershell
 cd backend
-mvn spring-boot:run
+& "C:\Users\vivek\Softwares\apache-maven-3.9.15-bin\apache-maven-3.9.15\bin\mvn.cmd" spring-boot:run
 ```
 
 The backend starts on `http://localhost:8080`.
-
-Health check:
-
-```powershell
-Invoke-RestMethod http://localhost:8080/api/health
-```
 
 ## Run the Frontend
 
@@ -60,15 +54,29 @@ npm run dev
 
 The frontend starts on `http://localhost:3000` and calls the backend at `http://localhost:8080`.
 
-## Validate Opportunities API
+## Manual Validation
 
-With the backend running:
+Backend health endpoint:
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/health"
+```
+
+Expected:
+
+```json
+{
+  "status": "OK"
+}
+```
+
+Opportunities endpoint:
 
 ```powershell
 Invoke-RestMethod "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA"
 ```
 
-Or open:
+Exact browser URL:
 
 ```text
 http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA
@@ -92,12 +100,21 @@ Expected response shape:
       "code": "CA",
       "displayName": "Canada"
     },
-    "score": 86,
-    "scoreLabel": "High",
+    "score": 78,
+    "scoreLabel": "Promising",
+    "marketplaceProofScore": 98,
+    "priceViabilityScore": 70,
+    "freshnessScore": 80,
+    "sellerQualityScore": 100,
+    "shippingRiskScore": 80,
+    "competitionRiskScore": 65,
+    "finalScore": 78,
     "marketplaceEvidence": {
       "estimatedSoldCount": 6820,
       "activeListings": 10,
       "medianPrice": 153.87,
+      "minPrice": 14.38,
+      "maxPrice": 431.4,
       "demandSignal": "Live eBay Browse result with 6820 total matches for query \"slime anime figure\"; seller feedback 99.9%"
     },
     "sourceEvidence": [
@@ -123,16 +140,12 @@ Expected response shape:
 
 If eBay is disabled or unavailable, the same endpoint returns the same normalized shape with `sourceEvidence[0].sourceType` set to `marketplace_mock`.
 
-## Validate Frontend
+Frontend validation:
 
 1. Start the backend on port `8080`.
 2. Start the frontend on port `3000`.
 3. Open `http://localhost:3000`.
-4. Confirm the dashboard shows:
-   - niche selector placeholder set to Anime collectibles
-   - region selector placeholder set to Canada
-   - top opportunity cards from the backend
-   - evidence summary rows
-   - risk badges
-   - score badges
-5. Stop the backend and refresh the frontend to confirm the error state appears.
+4. Confirm the dashboard shows top opportunity cards from the backend.
+5. Confirm each opportunity card shows the final score badge.
+6. Confirm each opportunity card includes a `Score Breakdown` section with marketplace proof, price viability, freshness, seller quality, shipping risk, and competition risk.
+7. Stop the backend and refresh the frontend to confirm the error state appears.

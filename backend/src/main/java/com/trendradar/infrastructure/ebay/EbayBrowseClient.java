@@ -96,6 +96,7 @@ public class EbayBrowseClient {
         EbayItemLocation itemLocation,
         boolean topRatedBuyingExperience,
         boolean priorityListing,
+        Instant itemOriginDate,
         Instant itemCreationDate
     ) {
     }
@@ -117,7 +118,7 @@ public class EbayBrowseClient {
     public record EbaySeller(
         String username,
         String feedbackPercentage,
-        int feedbackScore
+        Integer feedbackScore
     ) {
     }
 
