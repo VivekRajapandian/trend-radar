@@ -1,16 +1,118 @@
-const signalCards = [
-  { label: "Opportunity Index", value: "82", trend: "+12 pts", tone: "strong" },
-  { label: "Rising Products", value: "24", trend: "+8 today", tone: "cool" },
-  { label: "Seasonal Signals", value: "11", trend: "4 urgent", tone: "warm" }
-];
+"use client";
 
-const opportunities = [
-  { product: "Compact travel organizers", score: 91, signal: "Marketplace momentum", stage: "Watch" },
-  { product: "Desk cable kits", score: 86, signal: "Demand consistency", stage: "Research" },
-  { product: "Pet cooling mats", score: 79, signal: "Seasonal lift", stage: "Validate" }
-];
+import { useEffect, useMemo, useState } from "react";
+
+type ProductConcept = {
+  id: string;
+  name: string;
+  category: string;
+};
+
+type Niche = {
+  code: string;
+  displayName: string;
+};
+
+type Region = {
+  code: string;
+  displayName: string;
+};
+
+type MarketplaceEvidence = {
+  estimatedSoldCount: number;
+  activeListings: number;
+  medianPrice: number;
+  demandSignal: string;
+};
+
+type SourceEvidence = {
+  sourceType: string;
+  title: string;
+  confidence: number;
+  observedAt: string;
+};
+
+type RiskSignal = {
+  type: string;
+  severity: string;
+  description: string;
+};
+
+type OpportunitySnapshot = {
+  productConcept: ProductConcept;
+  niche: Niche;
+  region: Region;
+  score: number;
+  scoreLabel: string;
+  marketplaceEvidence: MarketplaceEvidence;
+  sourceEvidence: SourceEvidence[];
+  risks: RiskSignal[];
+  explanation: string;
+  generatedAt: string;
+};
+
+const OPPORTUNITIES_URL =
+  "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA";
 
 export default function Home() {
+  const [opportunities, setOpportunities] = useState<OpportunitySnapshot[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadOpportunities() {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch(OPPORTUNITIES_URL, {
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`Backend returned ${response.status}`);
+        }
+
+        const data = (await response.json()) as OpportunitySnapshot[];
+        setOpportunities(data);
+      } catch (caughtError) {
+        if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
+          return;
+        }
+
+        setError(caughtError instanceof Error ? caughtError.message : "Unable to load opportunities");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadOpportunities();
+
+    return () => controller.abort();
+  }, []);
+
+  const summary = useMemo(() => {
+    const topScore = opportunities.length
+      ? Math.max(...opportunities.map((opportunity) => opportunity.score))
+      : 0;
+
+    const riskCount = opportunities.reduce(
+      (count, opportunity) => count + opportunity.risks.length,
+      0
+    );
+
+    return [
+      { label: "Top Score", value: topScore ? String(topScore) : "-", detail: "normalized", tone: "strong" },
+      { label: "Opportunities", value: String(opportunities.length), detail: "mocked", tone: "cool" },
+      { label: "Risk Signals", value: String(riskCount), detail: "review", tone: "warm" }
+    ];
+  }, [opportunities]);
+
+  const activeNiche = opportunities[0]?.niche.displayName ?? "Anime collectibles";
+  const activeRegion = opportunities[0]?.region.displayName ?? "Canada";
+
   return (
     <main className="dashboard-shell">
       <aside className="sidebar">
@@ -28,8 +130,8 @@ export default function Home() {
           <a href="#">Providers</a>
         </nav>
         <div className="sidebar-note">
-          <span>Focus queue</span>
-          <p>New signals are grouped by momentum, seasonality, and confidence.</p>
+          <span>Normalized API</span>
+          <p>Cards are rendered from backend opportunity snapshots, not marketplace-shaped data.</p>
         </div>
       </aside>
 
@@ -37,65 +139,123 @@ export default function Home() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Product intelligence</p>
-            <h2>Discover what is getting hot before everyone else.</h2>
+            <h2>Opportunity signals for focused seller research.</h2>
           </div>
-          <button className="ghost-button" type="button">Refresh</button>
+          <div className="selector-row" aria-label="Opportunity filters">
+            <button className="selector-button" type="button">
+              <span>Niche</span>
+              {activeNiche}
+            </button>
+            <button className="selector-button" type="button">
+              <span>Region</span>
+              {activeRegion}
+            </button>
+          </div>
         </header>
 
         <section className="metrics-grid" aria-label="Signal summary">
-          {signalCards.map((card) => (
+          {summary.map((card) => (
             <article className={`metric-card ${card.tone}`} key={card.label}>
               <p>{card.label}</p>
               <div>
                 <strong>{card.value}</strong>
-                <span>{card.trend}</span>
+                <span>{card.detail}</span>
               </div>
             </article>
           ))}
         </section>
 
-        <section className="content-grid">
-          <article className="radar-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Radar view</p>
-                <h3>Normalized opportunity signals</h3>
-              </div>
-              <span className="status-pill">Current</span>
-            </div>
-            <div className="radar-visual" aria-label="Decorative radar chart">
-              <span className="ring ring-one" />
-              <span className="ring ring-two" />
-              <span className="ring ring-three" />
-              <span className="radar-sweep" />
-              <span className="radar-dot dot-one" />
-              <span className="radar-dot dot-two" />
-              <span className="radar-dot dot-three" />
-            </div>
-          </article>
-
-          <article className="opportunity-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Top candidates</p>
-                <h3>Opportunity queue</h3>
-              </div>
-              <span className="status-pill">Ranked</span>
-            </div>
-            <div className="opportunity-list">
-              {opportunities.map((item) => (
-                <div className="opportunity-row" key={item.product}>
-                  <div>
-                    <strong>{item.product}</strong>
-                    <span>{item.signal}</span>
-                  </div>
-                  <p>{item.score}</p>
-                  <em>{item.stage}</em>
+        {isLoading ? (
+          <section className="state-panel" aria-live="polite">
+            <span className="loading-bar" />
+            <h3>Loading opportunities</h3>
+            <p>TrendRadar is asking the backend for normalized opportunity snapshots.</p>
+          </section>
+        ) : error ? (
+          <section className="state-panel error-state" aria-live="polite">
+            <h3>Unable to reach the opportunity API</h3>
+            <p>{error}</p>
+            <p>Start the Spring Boot backend on port 8080, then refresh this page.</p>
+          </section>
+        ) : (
+          <section className="content-grid">
+            <article className="opportunity-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Top opportunities</p>
+                  <h3>Ranked product concepts</h3>
                 </div>
-              ))}
-            </div>
-          </article>
-        </section>
+                <span className="status-pill">Backend data</span>
+              </div>
+
+              <div className="opportunity-list">
+                {opportunities.map((opportunity) => (
+                  <article className="opportunity-card" key={opportunity.productConcept.id}>
+                    <div className="opportunity-card-header">
+                      <div>
+                        <p className="category-label">{opportunity.productConcept.category}</p>
+                        <h4>{opportunity.productConcept.name}</h4>
+                      </div>
+                      <div className="score-badge">
+                        <strong>{opportunity.score}</strong>
+                        <span>{opportunity.scoreLabel}</span>
+                      </div>
+                    </div>
+
+                    <p className="explanation">{opportunity.explanation}</p>
+
+                    <div className="evidence-summary">
+                      <div>
+                        <span>Sold</span>
+                        <strong>{opportunity.marketplaceEvidence.estimatedSoldCount}</strong>
+                      </div>
+                      <div>
+                        <span>Listings</span>
+                        <strong>{opportunity.marketplaceEvidence.activeListings}</strong>
+                      </div>
+                      <div>
+                        <span>Median</span>
+                        <strong>${Number(opportunity.marketplaceEvidence.medianPrice).toFixed(2)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="risk-row" aria-label={`${opportunity.productConcept.name} risk signals`}>
+                      {opportunity.risks.map((risk) => (
+                        <span className={`risk-badge ${risk.severity.toLowerCase()}`} key={risk.type}>
+                          {risk.severity}: {risk.type.replaceAll("_", " ")}
+                        </span>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </article>
+
+            <article className="evidence-panel">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Evidence summary</p>
+                  <h3>Why these concepts surfaced</h3>
+                </div>
+                <span className="status-pill">Mock sources</span>
+              </div>
+
+              <div className="source-list">
+                {opportunities.flatMap((opportunity) =>
+                  opportunity.sourceEvidence.map((source) => (
+                    <div className="source-row" key={`${opportunity.productConcept.id}-${source.title}`}>
+                      <div>
+                        <strong>{source.title}</strong>
+                        <span>{opportunity.productConcept.name}</span>
+                      </div>
+                      <p>{Math.round(source.confidence * 100)}%</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </article>
+          </section>
+        )}
       </section>
     </main>
   );

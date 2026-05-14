@@ -2,12 +2,12 @@
 
 TrendRadar is a product opportunity intelligence platform for online sellers.
 
-This repository is an initial monorepo with:
+This repository is a monorepo with:
 
-- `backend`: Spring Boot API skeleton
-- `frontend`: Next.js dashboard shell
+- `backend`: Spring Boot API
+- `frontend`: Next.js dashboard
 
-Milestone 1 intentionally does not include eBay integration, persistence, scoring, or provider-specific models.
+Milestone 3 adds the first real marketplace provider boundary with an eBay Browse API adapter. The frontend still consumes only normalized TrendRadar opportunity snapshots. No database, OpenAI, Google Trends, or committed secrets are included.
 
 ## Prerequisites
 
@@ -15,6 +15,25 @@ Milestone 1 intentionally does not include eBay integration, persistence, scorin
 - Maven 3.9+
 - Node.js 20+
 - npm 10+
+
+## eBay Local Configuration
+
+The backend is safe by default: eBay is disabled unless explicitly enabled and configured. Without eBay credentials, `/api/opportunities` falls back to mocked normalized marketplace data.
+
+Create `backend/.env` from `backend/.env.example`:
+
+```properties
+TREND_RADAR_EBAY_ENABLED=true
+TREND_RADAR_EBAY_TOKEN_URL=https://api.sandbox.ebay.com/identity/v1/oauth2/token
+TREND_RADAR_EBAY_SEARCH_URL=https://api.ebay.com/buy/browse/v1/item_summary/search
+TREND_RADAR_EBAY_USERNAME=your-ebay-client-id
+TREND_RADAR_EBAY_PASSWORD=your-ebay-client-secret
+TREND_RADAR_EBAY_SCOPE=https://api.ebay.com/oauth/api_scope
+TREND_RADAR_EBAY_LIMIT=10
+TREND_RADAR_EBAY_MARKETPLACE_ID=EBAY_CA
+```
+
+`backend/.env` is ignored by git. In higher environments, pass the same values as environment variables instead of using a local file.
 
 ## Run the Backend
 
@@ -31,14 +50,6 @@ Health check:
 Invoke-RestMethod http://localhost:8080/api/health
 ```
 
-Expected response:
-
-```json
-{
-  "status": "OK"
-}
-```
-
 ## Run the Frontend
 
 ```powershell
@@ -47,11 +58,81 @@ npm install
 npm run dev
 ```
 
-The frontend starts on `http://localhost:3000`.
+The frontend starts on `http://localhost:3000` and calls the backend at `http://localhost:8080`.
 
-## Manual Validation
+## Validate Opportunities API
 
-1. Start the backend and open `http://localhost:8080/api/health`.
-2. Confirm the response is JSON with `status` set to `OK`.
-3. Start the frontend and open `http://localhost:3000`.
-4. Confirm the TrendRadar dashboard shell renders with the overview, signal cards, radar panel, and opportunity table.
+With the backend running:
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA"
+```
+
+Or open:
+
+```text
+http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA
+```
+
+Expected response shape:
+
+```json
+[
+  {
+    "productConcept": {
+      "id": "v1|227244758280|0",
+      "name": "Reincarnated as a Slime Figure",
+      "category": "Other Animation Merchandise"
+    },
+    "niche": {
+      "code": "anime_collectibles",
+      "displayName": "Anime collectibles"
+    },
+    "region": {
+      "code": "CA",
+      "displayName": "Canada"
+    },
+    "score": 86,
+    "scoreLabel": "High",
+    "marketplaceEvidence": {
+      "estimatedSoldCount": 6820,
+      "activeListings": 10,
+      "medianPrice": 153.87,
+      "demandSignal": "Live eBay Browse result with 6820 total matches for query \"slime anime figure\"; seller feedback 99.9%"
+    },
+    "sourceEvidence": [
+      {
+        "sourceType": "ebay_browse",
+        "title": "Reincarnated as a Slime Figure Set Collectible Anime Preowned Authentic",
+        "confidence": 0.95,
+        "observedAt": "2026-03-06T13:09:47Z"
+      }
+    ],
+    "risks": [
+      {
+        "type": "licensed_ip",
+        "severity": "MEDIUM",
+        "description": "Character merchandise may require careful sourcing"
+      }
+    ],
+    "explanation": "Short human-readable rationale for the opportunity.",
+    "generatedAt": "2026-05-14T00:00:00Z"
+  }
+]
+```
+
+If eBay is disabled or unavailable, the same endpoint returns the same normalized shape with `sourceEvidence[0].sourceType` set to `marketplace_mock`.
+
+## Validate Frontend
+
+1. Start the backend on port `8080`.
+2. Start the frontend on port `3000`.
+3. Open `http://localhost:3000`.
+4. Confirm the dashboard shows:
+   - niche selector placeholder set to Anime collectibles
+   - region selector placeholder set to Canada
+   - top opportunity cards from the backend
+   - evidence summary rows
+   - risk badges
+   - score badges
+5. Stop the backend and refresh the frontend to confirm the error state appears.
