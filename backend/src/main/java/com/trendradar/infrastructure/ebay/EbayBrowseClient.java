@@ -16,6 +16,8 @@ public class EbayBrowseClient {
 
     private final EbayProperties properties;
     private final RestClient restClient;
+    private String cachedAccessToken;
+    private Instant cachedAccessTokenExpiresAt;
 
     public EbayBrowseClient(EbayProperties properties) {
         this.properties = properties;
@@ -42,7 +44,11 @@ public class EbayBrowseClient {
             .body(EbaySearchResponse.class);
     }
 
-    private String fetchAccessToken() {
+    private synchronized String fetchAccessToken() {
+        if (cachedAccessToken != null && cachedAccessTokenExpiresAt != null && cachedAccessTokenExpiresAt.isAfter(Instant.now())) {
+            return cachedAccessToken;
+        }
+
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("grant_type", "client_credentials");
         formData.add("scope", properties.scope());
@@ -62,7 +68,10 @@ public class EbayBrowseClient {
             throw new IllegalStateException("eBay token response did not include an access token");
         }
 
-        return tokenResponse.accessToken();
+        cachedAccessToken = tokenResponse.accessToken();
+        cachedAccessTokenExpiresAt = Instant.now().plusSeconds(Math.max(60, tokenResponse.expiresIn() - 60));
+
+        return cachedAccessToken;
     }
 
     public record EbayTokenResponse(

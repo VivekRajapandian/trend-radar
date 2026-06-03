@@ -41,8 +41,9 @@ export default function SystemStatusPage() {
         </div>
         <nav className="nav-list" aria-label="Primary navigation">
           <a href="/">Dashboard</a>
-          <a href="#">Signals</a>
-          <a href="#">Opportunities</a>
+          <a href="/seed-terms">Signals</a>
+          <a href="/#opportunities">Opportunities</a>
+          <a href="/seed-terms">Seed Terms</a>
           <a href="/provider-runs">Provider Runs</a>
           <a className="active" href="/system-status">System Status</a>
         </nav>
@@ -83,6 +84,18 @@ export default function SystemStatusPage() {
               <div className="ops-metadata">
                 <span>Source records</span>
                 <strong>{status?.totalSourceRecordsStored ?? 0}</strong>
+              </div>
+            </article>
+            <article className="ops-card">
+              <p className="eyebrow">Scheduler</p>
+              <h3>{status?.schedulerEnabled ? "Enabled" : "Disabled"}</h3>
+              <div className="ops-metadata">
+                <span>Fixed rate</span>
+                <strong>{status?.schedulerFixedRateMinutes ?? 360} min</strong>
+              </div>
+              <div className="ops-metadata">
+                <span>Enabled seeds</span>
+                <strong>{status?.enabledSeedTermCount ?? 0}</strong>
               </div>
             </article>
             <article className="ops-card wide">

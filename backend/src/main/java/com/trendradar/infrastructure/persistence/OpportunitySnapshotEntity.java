@@ -37,6 +37,9 @@ public class OpportunitySnapshotEntity extends AuditableEntity {
     @Column(name = "category_name")
     private String categoryName;
 
+    @Column(name = "image_url", length = 1200)
+    private String imageUrl;
+
     @Column(name = "niche_code", nullable = false)
     private String nicheCode;
 
@@ -128,6 +131,10 @@ public class OpportunitySnapshotEntity extends AuditableEntity {
 
     public String getCategoryName() {
         return categoryName;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
     }
 
     public String getNicheCode() {
@@ -240,6 +247,10 @@ public class OpportunitySnapshotEntity extends AuditableEntity {
 
     public void setCategoryName(String categoryName) {
         this.categoryName = categoryName;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public void setNicheCode(String nicheCode) {

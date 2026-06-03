@@ -23,6 +23,15 @@ public class MockMarketSignalProvider implements MarketSignalProvider {
     }
 
     @Override
+    public String queryFor(Niche niche, Region region, String searchTerm) {
+        if (searchTerm == null || searchTerm.isBlank()) {
+            return queryFor(niche, region);
+        }
+
+        return "mock:" + searchTerm;
+    }
+
+    @Override
     public MarketSignalBatch fetchSignals(Niche niche, Region region) {
         Instant observedAt = Instant.now();
 

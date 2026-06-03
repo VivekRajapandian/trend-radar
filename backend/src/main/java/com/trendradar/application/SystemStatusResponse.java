@@ -11,6 +11,10 @@ public record SystemStatusResponse(
     long totalOpportunitiesStored,
     long totalSourceRecordsStored,
     List<ProviderStatus> activeProviders,
+    boolean schedulerEnabled,
+    long schedulerFixedRateMinutes,
+    long enabledSeedTermCount,
+    Instant latestIngestionRunAt,
     Instant generatedAt
 ) {
 

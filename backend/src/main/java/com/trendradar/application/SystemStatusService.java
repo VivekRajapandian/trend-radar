@@ -6,6 +6,7 @@ import com.trendradar.infrastructure.persistence.OpportunitySnapshotRepository;
 import com.trendradar.infrastructure.persistence.ProviderRunRepository;
 import com.trendradar.infrastructure.persistence.ScoringRunEntity;
 import com.trendradar.infrastructure.persistence.ScoringRunRepository;
+import com.trendradar.infrastructure.persistence.SeedTermRepository;
 import com.trendradar.infrastructure.persistence.SourceRecordRepository;
 import com.trendradar.provider.MarketSignalProvider;
 import java.sql.Connection;
@@ -24,8 +25,10 @@ public class SystemStatusService {
     private final ScoringRunRepository scoringRunRepository;
     private final OpportunitySnapshotRepository opportunitySnapshotRepository;
     private final SourceRecordRepository sourceRecordRepository;
+    private final SeedTermRepository seedTermRepository;
     private final ProviderRunQueryService providerRunQueryService;
     private final List<MarketSignalProvider> marketSignalProviders;
+    private final IngestionProperties ingestionProperties;
 
     public SystemStatusService(
         DataSource dataSource,
@@ -33,16 +36,20 @@ public class SystemStatusService {
         ScoringRunRepository scoringRunRepository,
         OpportunitySnapshotRepository opportunitySnapshotRepository,
         SourceRecordRepository sourceRecordRepository,
+        SeedTermRepository seedTermRepository,
         ProviderRunQueryService providerRunQueryService,
-        List<MarketSignalProvider> marketSignalProviders
+        List<MarketSignalProvider> marketSignalProviders,
+        IngestionProperties ingestionProperties
     ) {
         this.dataSource = dataSource;
         this.providerRunRepository = providerRunRepository;
         this.scoringRunRepository = scoringRunRepository;
         this.opportunitySnapshotRepository = opportunitySnapshotRepository;
         this.sourceRecordRepository = sourceRecordRepository;
+        this.seedTermRepository = seedTermRepository;
         this.providerRunQueryService = providerRunQueryService;
         this.marketSignalProviders = marketSignalProviders;
+        this.ingestionProperties = ingestionProperties;
     }
 
     @Transactional(readOnly = true)
@@ -65,6 +72,10 @@ public class SystemStatusService {
             marketSignalProviders.stream()
                 .map(provider -> new ProviderStatus(provider.sourceType(), provider.isAvailable()))
                 .toList(),
+            ingestionProperties.enabled(),
+            ingestionProperties.fixedRateMinutes(),
+            seedTermRepository.countByEnabledTrue(),
+            latestProviderRun == null ? null : latestProviderRun.startedAt(),
             Instant.now()
         );
     }

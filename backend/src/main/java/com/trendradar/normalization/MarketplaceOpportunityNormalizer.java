@@ -60,7 +60,8 @@ public class MarketplaceOpportunityNormalizer implements OpportunityNormalizer {
         ProductConcept productConcept = new ProductConcept(
             product.id(),
             toProductConceptName(product.title()),
-            product.categoryName()
+            product.categoryName(),
+            product.imageUrl()
         );
         Instant generatedAt = Instant.now();
 

@@ -234,6 +234,7 @@ public class OpportunityPersistenceService {
         entity.setProductConceptId(snapshot.productConcept().id());
         entity.setProductName(snapshot.productConcept().name());
         entity.setCategoryName(snapshot.productConcept().category());
+        entity.setImageUrl(snapshot.productConcept().imageUrl());
         entity.setNicheCode(snapshot.niche().code());
         entity.setNicheDisplayName(snapshot.niche().displayName());
         entity.setRegionCode(snapshot.region().code());
@@ -263,7 +264,12 @@ public class OpportunityPersistenceService {
 
     private OpportunitySnapshot toDomain(OpportunitySnapshotEntity entity) {
         return new OpportunitySnapshot(
-            new ProductConcept(entity.getProductConceptId(), entity.getProductName(), entity.getCategoryName()),
+            new ProductConcept(
+                entity.getProductConceptId(),
+                entity.getProductName(),
+                entity.getCategoryName(),
+                entity.getImageUrl()
+            ),
             new Niche(entity.getNicheCode(), entity.getNicheDisplayName()),
             new Region(entity.getRegionCode(), entity.getRegionDisplayName()),
             entity.getScore(),

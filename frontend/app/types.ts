@@ -45,5 +45,32 @@ export type SystemStatus = {
     sourceType: string;
     available: boolean;
   }>;
+  schedulerEnabled: boolean;
+  schedulerFixedRateMinutes: number;
+  enabledSeedTermCount: number;
+  latestIngestionRunAt: string | null;
   generatedAt: string;
+};
+
+export type SeedTerm = {
+  id: number;
+  niche: string;
+  region: string;
+  searchTerm: string;
+  enabled: boolean;
+  priority: number;
+  sourceType: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type IngestionRunSummary = {
+  startedAt: string;
+  completedAt: string;
+  totalSeedTerms: number;
+  successfulRuns: number;
+  failedRuns: number;
+  totalRecordsFetched: number;
+  opportunitiesGenerated: number;
+  errors: string[];
 };

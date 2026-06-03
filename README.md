@@ -2,7 +2,7 @@
 
 TrendRadar is a product opportunity intelligence platform for online sellers. It turns marketplace signals into normalized, explainable product opportunity snapshots with scoring, evidence, risk context, provider run history, and system visibility.
 
-The current implementation is a modular monolith backend, a Next.js operational dashboard, PostgreSQL persistence, Liquibase migrations, an optional eBay Browse provider, a deterministic scoring engine, and a Docker Compose local stack.
+The current implementation is a modular monolith backend, a Next.js operational dashboard, PostgreSQL persistence, Liquibase migrations, seed-term managed ingestion, an optional eBay Browse provider, a deterministic scoring engine, and a Docker Compose local stack.
 
 ## Features
 
@@ -12,10 +12,13 @@ Currently implemented:
 - Normalized opportunity API consumed by the frontend.
 - Health endpoint for backend validation.
 - Manual opportunity refresh endpoint.
+- Seed term management APIs and Seed Terms / Ingestion page.
+- Manual ingestion endpoint that runs enabled seed terms.
+- Scheduled ingestion support, disabled by default.
 - Provider run history API with pagination.
-- System status API with backend, database, storage, provider, and latest-run status.
-- Dashboard sections for system status, last refresh, and recent provider runs.
-- Dedicated Provider Runs and System Status pages.
+- System status API with backend, database, storage, provider, scheduler, seed-term, and latest-run status.
+- Dashboard sections for system status, scheduler status, last refresh, and recent provider runs.
+- Dedicated Seed Terms, Provider Runs, and System Status pages.
 - Provider layer with optional eBay Browse API integration.
 - Mock marketplace provider fallback when eBay is disabled or missing credentials.
 - Normalization from provider signals into TrendRadar domain concepts.
@@ -35,8 +38,8 @@ Currently implemented:
 Not implemented yet:
 
 - OpenAI-powered explanation layer.
-- Google Trends or other demand provider.
-- Scheduled ingestion.
+- Google Trends or other demand provider. Not planned for the near-term roadmap.
+- TikTok or social buzz ingestion. Not planned for the near-term roadmap.
 - Alerts, watchlists, or notifications.
 - Authentication or user accounts.
 - Kubernetes, Redis, message queues, or microservices.
@@ -45,8 +48,8 @@ Not implemented yet:
 
 TrendRadar has three local runtime components:
 
-- **Frontend:** Next.js app on port `3000`. It renders opportunity cards, score breakdowns, system status, recent provider runs, Provider Runs, and System Status views.
-- **Backend:** Spring Boot API on port `8080`. It owns provider orchestration, normalization, scoring, explanations, persistence, provider run history, and system status responses.
+- **Frontend:** Next.js app on port `3000`. It renders opportunity cards, score breakdowns, seed terms, ingestion controls, system status, recent provider runs, Provider Runs, and System Status views.
+- **Backend:** Spring Boot API on port `8080`. It owns seed-term management, provider orchestration, ingestion, normalization, scoring, explanations, persistence, provider run history, and system status responses.
 - **Database:** PostgreSQL on port `5432`. Liquibase creates and updates the schema automatically when the backend starts.
 
 The frontend uses Next.js API proxy routes for browser-safe and container-safe calls. The proxy uses `TREND_RADAR_API_BASE_URL`, which is `http://trend-radar-backend:8080` inside Docker and defaults to `http://localhost:8080` for non-Docker local development.
@@ -55,17 +58,21 @@ The frontend uses Next.js API proxy routes for browser-safe and container-safe c
 
 The backend is organized as a modular monolith:
 
-- **Provider layer:** Fetches raw marketplace signals. `EbayMarketSignalProvider` is first priority when enabled and configured. `MockMarketSignalProvider` keeps the app runnable without external credentials.
+- **Provider layer:** Fetches raw marketplace signals. eBay Browse is the only real provider in scope. `MockMarketSignalProvider` remains a local/test fallback when eBay is disabled or credentials are missing.
+- **Seed term layer:** Stores enabled search terms by niche, region, priority, and source type. Ingestion reads these terms and passes concrete search text into the provider layer.
 - **Normalization layer:** Converts provider-shaped marketplace signals into normalized `OpportunitySnapshot` domain responses.
 - **Scoring layer:** Calculates explainable score components and final score labels: `High`, `Promising`, `Watch`, or `Weak`.
 - **Explanation layer:** Generates deterministic text explanations from marketplace evidence and risks.
 - **Persistence layer:** Stores provider execution metadata, raw source JSON, normalized signals, scoring metadata, final opportunity snapshots, and audit timestamps.
 - **Observability layer:** Exposes provider run history and aggregate system status from persisted runs, scoring records, source records, snapshots, provider availability, and database connectivity.
+- **Ingestion layer:** Runs enabled seed terms manually or on a fixed schedule when `TREND_RADAR_SCHEDULER_ENABLED=true`.
 - **API layer:** Exposes normalized TrendRadar APIs only. eBay-shaped models are not exposed to the frontend.
 
 `GET /api/opportunities` returns the latest persisted snapshots for the requested niche and region. If none exist, it performs a refresh, persists the results, and returns normalized opportunities.
 
 `POST /api/opportunities/refresh` always runs a provider fetch, normalization, scoring, persistence, and response cycle.
+
+`POST /api/ingestion/run` runs the same pipeline for enabled seed terms, optionally filtered by `niche` and `region`.
 
 ## Tech Stack
 
@@ -104,8 +111,11 @@ trend-radar/
     Dockerfile
     app/
       api/opportunities/   Next.js proxy to backend opportunities API
+      api/ingestion/run/   Next.js proxy to manual ingestion API
       api/provider-runs/   Next.js proxy to backend provider run APIs
+      api/seed-terms/      Next.js proxy to backend seed term APIs
       api/system/status/   Next.js proxy to backend system status API
+      seed-terms/          seed term table and manual ingestion page
       provider-runs/       provider run history page
       system-status/       system status page
       page.tsx             main dashboard UI
@@ -252,6 +262,8 @@ Backend variables:
 | `TREND_RADAR_EBAY_SCOPE` | `https://api.ebay.com/oauth/api_scope` | eBay OAuth scope. |
 | `TREND_RADAR_EBAY_LIMIT` | `10` | eBay search result limit. |
 | `TREND_RADAR_EBAY_MARKETPLACE_ID` | `EBAY_CA` | eBay marketplace header value. |
+| `TREND_RADAR_SCHEDULER_ENABLED` | `false` | Enables fixed-rate seed-term ingestion when set to `true`. |
+| `TREND_RADAR_SCHEDULER_FIXED_RATE_MINUTES` | `360` | Scheduled ingestion cadence in minutes. |
 
 Docker Compose variables:
 
@@ -264,6 +276,8 @@ Docker Compose variables:
 | `TREND_RADAR_EBAY_USERNAME` | empty | Passed to backend container. |
 | `TREND_RADAR_EBAY_PASSWORD` | empty | Passed to backend container. |
 | `TREND_RADAR_EBAY_MARKETPLACE_ID` | `EBAY_CA` | Passed to backend container. |
+| `TREND_RADAR_SCHEDULER_ENABLED` | `false` | Passed to backend container. Disabled by default for predictable local development. |
+| `TREND_RADAR_SCHEDULER_FIXED_RATE_MINUTES` | `360` | Passed to backend container. |
 
 Frontend variable:
 
@@ -327,6 +341,77 @@ Behavior:
 - Persists raw source records, normalized signals, scoring run metadata, and opportunity snapshots.
 - Returns normalized opportunities.
 
+### Seed Terms
+
+```http
+GET /api/seed-terms
+GET /api/seed-terms?niche=anime_collectibles&region=CA
+POST /api/seed-terms
+PATCH /api/seed-terms/{id}
+DELETE /api/seed-terms/{id}
+```
+
+Seed terms are persisted search terms used by ingestion. Each term has a niche, region, search term, enabled flag, priority, source type, and audit timestamps.
+
+Initial Liquibase seed terms:
+
+- `anime_collectibles` / `CA` / `slime anime figure`
+- `anime_collectibles` / `CA` / `rimuru figure`
+- `fitness_accessories` / `CA` / `running belt`
+- `fitness_accessories` / `CA` / `hydration vest`
+
+Examples:
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/seed-terms"
+Invoke-RestMethod "http://localhost:8080/api/seed-terms?niche=anime_collectibles&region=CA"
+
+$created = Invoke-RestMethod -Method Post "http://localhost:8080/api/seed-terms" `
+  -ContentType "application/json" `
+  -Body '{"niche":"anime_collectibles","region":"CA","searchTerm":"anime keychain","enabled":true,"priority":50,"sourceType":"ebay_browse"}'
+
+Invoke-RestMethod -Method Patch "http://localhost:8080/api/seed-terms/$($created.id)" `
+  -ContentType "application/json" `
+  -Body '{"enabled":false,"priority":25}'
+
+Invoke-RestMethod -Method Delete "http://localhost:8080/api/seed-terms/$($created.id)"
+```
+
+### Manual Ingestion
+
+```http
+POST /api/ingestion/run
+POST /api/ingestion/run?niche=anime_collectibles&region=CA
+```
+
+When `niche` and `region` are provided, ingestion runs enabled seed terms only for that niche and region. Without filters, it runs all enabled seed terms.
+
+```powershell
+Invoke-RestMethod -Method Post "http://localhost:8080/api/ingestion/run?niche=anime_collectibles&region=CA" | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Method Post "http://localhost:8080/api/ingestion/run" | ConvertTo-Json -Depth 6
+```
+
+The summary response includes `startedAt`, `completedAt`, `totalSeedTerms`, `successfulRuns`, `failedRuns`, `totalRecordsFetched`, `opportunitiesGenerated`, and `errors`.
+
+Verify provider runs were created after ingestion:
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/provider-runs?page=0&size=20" | ConvertTo-Json -Depth 6
+```
+
+With the mock provider active, latest run queries should include seed text such as `mock:slime anime figure`.
+
+### Scheduler Config
+
+Scheduled ingestion uses the same seed-term flow as the manual endpoint and is disabled by default.
+
+```properties
+TREND_RADAR_SCHEDULER_ENABLED=false
+TREND_RADAR_SCHEDULER_FIXED_RATE_MINUTES=360
+```
+
+Set `TREND_RADAR_SCHEDULER_ENABLED=true` to run enabled seed terms on the configured fixed rate. Do not enable it for routine local development unless you want background provider runs.
+
 ### Provider Runs
 
 ```http
@@ -351,7 +436,7 @@ GET /api/system/status
 Invoke-RestMethod "http://localhost:8080/api/system/status"
 ```
 
-The response includes backend status, database connectivity, latest provider run, latest scoring run, stored opportunity/source record counts, active providers, and generation timestamp.
+The response includes backend status, database connectivity, latest provider run, latest scoring run, stored opportunity/source record counts, active providers, scheduler config, enabled seed term count, latest ingestion run time, and generation timestamp.
 
 ### Frontend Proxy Routes
 
@@ -359,8 +444,14 @@ These routes are served by Next.js and forwarded to the backend:
 
 ```http
 GET /api/opportunities?niche=anime_collectibles&region=CA
+POST /api/ingestion/run?niche=anime_collectibles&region=CA
 GET /api/provider-runs?page=0&size=20
 GET /api/provider-runs/{id}
+GET /api/seed-terms
+GET /api/seed-terms?niche=anime_collectibles&region=CA
+POST /api/seed-terms
+PATCH /api/seed-terms/{id}
+DELETE /api/seed-terms/{id}
 GET /api/system/status
 ```
 
@@ -470,7 +561,26 @@ The frontend consumes normalized TrendRadar data, not eBay-shaped data.
       "available": true
     }
   ],
+  "schedulerEnabled": false,
+  "schedulerFixedRateMinutes": 360,
+  "enabledSeedTermCount": 4,
+  "latestIngestionRunAt": "2026-05-14T12:00:00Z",
   "generatedAt": "2026-05-14T12:00:00Z"
+}
+```
+
+### Ingestion Run Summary
+
+```json
+{
+  "startedAt": "2026-05-14T12:00:00Z",
+  "completedAt": "2026-05-14T12:00:02Z",
+  "totalSeedTerms": 2,
+  "successfulRuns": 2,
+  "failedRuns": 0,
+  "totalRecordsFetched": 6,
+  "opportunitiesGenerated": 6,
+  "errors": []
 }
 ```
 
@@ -480,10 +590,14 @@ The frontend consumes normalized TrendRadar data, not eBay-shaped data.
 
 ```powershell
 Invoke-RestMethod "http://localhost:8080/api/health"
+Invoke-RestMethod "http://localhost:8080/api/seed-terms"
+Invoke-RestMethod -Method Post "http://localhost:8080/api/ingestion/run?niche=anime_collectibles&region=CA"
 Invoke-RestMethod "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA"
+Invoke-RestMethod "http://localhost:8080/api/provider-runs?page=0&size=20"
+Invoke-RestMethod "http://localhost:8080/api/system/status"
 ```
 
-The health endpoint should return `OK`. The opportunities endpoint should return an array of normalized opportunity snapshots.
+The health endpoint should return `OK`. Seed terms should include the Liquibase defaults. The ingestion response should report successful runs and fetched records. Opportunities should return normalized snapshots. Provider runs should show newly created runs for the seed terms. System status should show scheduler fields and `enabledSeedTermCount`.
 
 ### Confirm Frontend Works
 
@@ -491,6 +605,7 @@ Open:
 
 ```text
 http://localhost:3000
+http://localhost:3000/seed-terms
 ```
 
 Confirm the dashboard renders:
@@ -502,6 +617,7 @@ Confirm the dashboard renders:
 - risk badges
 - generated-at text
 - System Status card
+- Scheduler card
 - Last Refresh summary
 - Recent Provider Runs table
 
@@ -512,7 +628,7 @@ http://localhost:3000/provider-runs
 http://localhost:3000/system-status
 ```
 
-Confirm each page loads with operational data instead of an error state.
+Confirm each page loads with operational data instead of an error state. The Seed Terms page should show enabled/disabled status, niche, region, search term, priority, provider/source, timestamps, and a manual ingestion button.
 
 ### Confirm DB Connectivity
 
@@ -661,8 +777,10 @@ In another terminal:
 ```powershell
 docker compose ps
 Invoke-RestMethod "http://localhost:8080/api/health"
+Invoke-RestMethod "http://localhost:8080/api/seed-terms"
+Invoke-RestMethod -Method Post "http://localhost:8080/api/ingestion/run?niche=anime_collectibles&region=CA"
 Invoke-RestMethod "http://localhost:8080/api/opportunities?niche=anime_collectibles&region=CA"
-Invoke-RestMethod "http://localhost:8080/api/provider-runs?page=0&size=5"
+Invoke-RestMethod "http://localhost:8080/api/provider-runs?page=0&size=20"
 Invoke-RestMethod "http://localhost:8080/api/system/status"
 ```
 
@@ -670,6 +788,7 @@ Open:
 
 ```text
 http://localhost:3000
+http://localhost:3000/seed-terms
 http://localhost:3000/provider-runs
 http://localhost:3000/system-status
 ```
@@ -714,7 +833,7 @@ docker compose config
 
 ## Current Milestone Status
 
-Implemented through Milestone 6:
+Implemented through Milestone 7:
 
 - Milestone 1: initial Spring Boot backend, Next.js frontend, health endpoint, dashboard shell.
 - Milestone 2: normalized opportunity API with mocked data.
@@ -722,15 +841,15 @@ Implemented through Milestone 6:
 - Milestone 4: Opportunity Scoring Engine v1 with score breakdowns and frontend display.
 - Milestone 5: PostgreSQL persistence, Liquibase migrations, provider/scoring run tracking, raw source records, normalized signals, opportunity snapshots.
 - Milestone 5.1: Dockerized local development with one-command startup.
-- Milestone 6: provider run history APIs, system status API, operational dashboard sections, Provider Runs page, System Status page, audit timestamps, indexes, and observability tests.
+- Milestone 6: seed term persistence and APIs, initial seed data, manual ingestion, disabled-by-default scheduled ingestion, scheduler/system status fields, Seed Terms page, dashboard scheduler card, and ingestion tests.
+- Milestone 7: eBay-only provider direction, seed terms aligned to `ebay_browse`, cached eBay OAuth token reuse during ingestion, and clickable dashboard/seed-term controls for ingestion and seed management.
 
 ## Next Planned Milestones
 
 Planned, not yet implemented:
 
 - OpenAI-powered explanation layer for richer opportunity reasoning.
-- Google Trends or another demand provider.
-- Scheduled ingestion and refresh cadence.
+- Deeper eBay run detail, query tuning, and product deduplication.
 - Alerts, watchlists, or saved opportunities.
 - Authentication and user-specific workspaces.
 - More robust production configuration and deployment packaging.

@@ -46,8 +46,27 @@ public class EbayMarketSignalProvider implements MarketSignalProvider {
     }
 
     @Override
+    public String queryFor(Niche niche, Region region, String searchTerm) {
+        if (searchTerm == null || searchTerm.isBlank()) {
+            return queryFor(niche, region);
+        }
+
+        return searchTerm;
+    }
+
+    @Override
     public MarketSignalBatch fetchSignals(Niche niche, Region region) {
         String query = queryFor(niche, region);
+        return fetchSignals(query);
+    }
+
+    @Override
+    public MarketSignalBatch fetchSignals(Niche niche, Region region, String searchTerm) {
+        String query = queryFor(niche, region, searchTerm);
+        return fetchSignals(query);
+    }
+
+    private MarketSignalBatch fetchSignals(String query) {
         EbayBrowseClient.EbaySearchResponse response = ebayBrowseClient.search(query);
         List<EbayBrowseClient.EbayItemSummary> summaries = response == null || response.itemSummaries() == null
             ? List.of()

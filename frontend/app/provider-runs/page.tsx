@@ -44,8 +44,9 @@ export default function ProviderRunsPage() {
         </div>
         <nav className="nav-list" aria-label="Primary navigation">
           <a href="/">Dashboard</a>
-          <a href="#">Signals</a>
-          <a href="#">Opportunities</a>
+          <a href="/seed-terms">Signals</a>
+          <a href="/#opportunities">Opportunities</a>
+          <a href="/seed-terms">Seed Terms</a>
           <a className="active" href="/provider-runs">Provider Runs</a>
           <a href="/system-status">System Status</a>
         </nav>

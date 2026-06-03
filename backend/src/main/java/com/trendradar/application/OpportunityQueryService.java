@@ -50,10 +50,15 @@ public class OpportunityQueryService {
 
     @Transactional
     public List<OpportunitySnapshot> refreshOpportunities(String nicheCode, String regionCode) {
-        LOGGER.info("Refresh requested for niche {} and region {}", nicheCode, regionCode);
+        return refreshOpportunities(nicheCode, regionCode, null);
+    }
+
+    @Transactional
+    public List<OpportunitySnapshot> refreshOpportunities(String nicheCode, String regionCode, String searchTerm) {
+        LOGGER.info("Refresh requested for niche {}, region {}, and seed term {}", nicheCode, regionCode, searchTerm);
         Niche niche = Niche.fromCode(nicheCode);
         Region region = Region.fromCode(regionCode);
-        ProviderRunResult providerRunResult = fetchFirstAvailableSignalBatch(niche, region);
+        ProviderRunResult providerRunResult = fetchFirstAvailableSignalBatch(niche, region, searchTerm);
         MarketSignalBatch signalBatch = providerRunResult.signalBatch();
 
         List<SourceRecordEntity> sourceRecords = opportunityPersistenceService.saveSourceRecords(
@@ -92,7 +97,7 @@ public class OpportunityQueryService {
         }
     }
 
-    private ProviderRunResult fetchFirstAvailableSignalBatch(Niche niche, Region region) {
+    private ProviderRunResult fetchFirstAvailableSignalBatch(Niche niche, Region region, String searchTerm) {
         for (MarketSignalProvider marketSignalProvider : marketSignalProviders) {
             if (!marketSignalProvider.isAvailable()) {
                 continue;
@@ -100,7 +105,7 @@ public class OpportunityQueryService {
 
             ProviderRunEntity providerRun = opportunityPersistenceService.startProviderRun(
                 marketSignalProvider.sourceType(),
-                marketSignalProvider.queryFor(niche, region),
+                marketSignalProvider.queryFor(niche, region, searchTerm),
                 niche,
                 region
             );
@@ -112,7 +117,7 @@ public class OpportunityQueryService {
                     niche.code(),
                     region.code()
                 );
-                MarketSignalBatch signalBatch = marketSignalProvider.fetchSignals(niche, region);
+                MarketSignalBatch signalBatch = marketSignalProvider.fetchSignals(niche, region, searchTerm);
                 opportunityPersistenceService.completeProviderRun(providerRun, signalBatch);
 
                 if (!signalBatch.products().isEmpty()) {

@@ -8,6 +8,7 @@ type ProductConcept = {
   id: string;
   name: string;
   category: string;
+  imageUrl: string | null;
 };
 
 type Niche = {
@@ -71,20 +72,18 @@ export default function Home() {
   const [providerRuns, setProviderRuns] = useState<ProviderRun[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRunningIngestion, setIsRunningIngestion] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadOpportunities() {
+  async function loadDashboard(signal?: AbortSignal) {
       try {
         setIsLoading(true);
         setError(null);
 
         const [response, providerRunsResponse, systemStatusResponse] = await Promise.all([
-          fetch(OPPORTUNITIES_URL, { signal: controller.signal }),
-          fetch(PROVIDER_RUNS_URL, { signal: controller.signal }),
-          fetch(SYSTEM_STATUS_URL, { signal: controller.signal })
+          fetch(OPPORTUNITIES_URL, { signal }),
+          fetch(PROVIDER_RUNS_URL, { signal }),
+          fetch(SYSTEM_STATUS_URL, { signal })
         ]);
 
         if (!response.ok) {
@@ -111,12 +110,33 @@ export default function Home() {
       } finally {
         setIsLoading(false);
       }
-    }
+  }
 
-    loadOpportunities();
+  useEffect(() => {
+    const controller = new AbortController();
+
+    loadDashboard(controller.signal);
 
     return () => controller.abort();
   }, []);
+
+  async function runIngestion() {
+    try {
+      setIsRunningIngestion(true);
+      setError(null);
+      const response = await fetch("/api/ingestion/run?niche=anime_collectibles&region=CA", { method: "POST" });
+
+      if (!response.ok) {
+        throw new Error(`Ingestion returned ${response.status}`);
+      }
+
+      await loadDashboard();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to run ingestion");
+    } finally {
+      setIsRunningIngestion(false);
+    }
+  }
 
   const summary = useMemo(() => {
     const topScore = opportunities.length
@@ -156,8 +176,9 @@ export default function Home() {
         </div>
         <nav className="nav-list" aria-label="Primary navigation">
           <a className="active" href="/">Dashboard</a>
-          <a href="#">Signals</a>
-          <a href="#">Opportunities</a>
+          <a href="/seed-terms">Signals</a>
+          <a href="#opportunities">Opportunities</a>
+          <a href="/seed-terms">Seed Terms</a>
           <a href="/provider-runs">Provider Runs</a>
           <a href="/system-status">System Status</a>
         </nav>
@@ -175,13 +196,16 @@ export default function Home() {
             <p className="generated-at">Generated at {lastGeneratedAt}</p>
           </div>
           <div className="selector-row" aria-label="Opportunity filters">
-            <button className="selector-button" type="button">
+            <a className="selector-button" href="/seed-terms?niche=anime_collectibles&region=CA">
               <span>Niche</span>
               {activeNiche}
-            </button>
-            <button className="selector-button" type="button">
+            </a>
+            <a className="selector-button" href="/seed-terms?niche=anime_collectibles&region=CA">
               <span>Region</span>
               {activeRegion}
+            </a>
+            <button className="primary-action" type="button" onClick={runIngestion} disabled={isRunningIngestion}>
+              {isRunningIngestion ? "Running..." : "Run ingestion"}
             </button>
           </div>
         </header>
@@ -210,6 +234,18 @@ export default function Home() {
               <div className="ops-metadata">
                 <span>Opportunities stored</span>
                 <strong>{systemStatus?.totalOpportunitiesStored ?? "-"}</strong>
+              </div>
+            </article>
+            <article className="ops-card">
+              <p className="eyebrow">Scheduler</p>
+              <h3>{systemStatus?.schedulerEnabled ? "Enabled" : "Disabled"}</h3>
+              <div className="ops-metadata">
+                <span>Enabled seeds</span>
+                <strong>{systemStatus?.enabledSeedTermCount ?? "-"}</strong>
+              </div>
+              <div className="ops-metadata">
+                <span>Latest ingestion</span>
+                <strong>{formatDateTime(systemStatus?.latestIngestionRunAt)}</strong>
               </div>
             </article>
             <article className="ops-card">
@@ -259,7 +295,7 @@ export default function Home() {
             <p>Start the Spring Boot backend on port 8080, then refresh this page.</p>
           </section>
         ) : (
-          <section className="content-grid">
+          <section className="content-grid" id="opportunities">
             <article className="opportunity-panel">
               <div className="panel-heading">
                 <div>
@@ -271,68 +307,86 @@ export default function Home() {
 
               <div className="opportunity-list">
                 {opportunities.map((opportunity) => (
-                  <article className="opportunity-card" key={opportunity.productConcept.id}>
-                    <div className="opportunity-card-header">
-                      <div>
+                  <details className="opportunity-card compact-opportunity" key={opportunity.productConcept.id}>
+                    <summary className="opportunity-summary">
+                      <div className="product-thumb" aria-hidden="true">
+                        {opportunity.productConcept.imageUrl ? (
+                          <img src={opportunity.productConcept.imageUrl} alt="" />
+                        ) : (
+                          <span>{opportunity.productConcept.name.slice(0, 1)}</span>
+                        )}
+                      </div>
+                      <div className="opportunity-summary-main">
                         <p className="category-label">{opportunity.productConcept.category}</p>
                         <h4>{opportunity.productConcept.name}</h4>
                       </div>
-                      <div className="score-badge">
-                        <strong>{opportunity.finalScore}</strong>
-                        <span>{opportunity.scoreLabel}</span>
-                      </div>
-                    </div>
-
-                    <p className="explanation">{opportunity.explanation}</p>
-
-                    <div className="evidence-summary">
-                      <div>
-                        <span>Sold</span>
-                        <strong>{opportunity.marketplaceEvidence.estimatedSoldCount}</strong>
-                      </div>
-                      <div>
-                        <span>Listings</span>
-                        <strong>{opportunity.marketplaceEvidence.activeListings}</strong>
-                      </div>
-                      <div>
+                      <div className="compact-metric">
                         <span>Median</span>
                         <strong>${Number(opportunity.marketplaceEvidence.medianPrice).toFixed(2)}</strong>
                       </div>
-                    </div>
-
-                    <section className="score-breakdown" aria-label={`${opportunity.productConcept.name} score breakdown`}>
-                      <div className="breakdown-heading">
-                        <strong>Score Breakdown</strong>
-                        <span>Final {opportunity.finalScore}</span>
+                      <div className="compact-metric">
+                        <span>Listings</span>
+                        <strong>{opportunity.marketplaceEvidence.activeListings}</strong>
                       </div>
-                      <div className="breakdown-grid">
-                        {([
-                          ["Marketplace proof", opportunity.marketplaceProofScore],
-                          ["Price viability", opportunity.priceViabilityScore],
-                          ["Freshness", opportunity.freshnessScore],
-                          ["Seller quality", opportunity.sellerQualityScore],
-                          ["Shipping risk", opportunity.shippingRiskScore],
-                          ["Competition risk", opportunity.competitionRiskScore]
-                        ] as Array<[string, number]>).map(([label, value]) => (
-                          <div className="breakdown-row" key={label}>
-                            <span>{label}</span>
-                            <div>
-                              <i style={{ width: `${value}%` }} />
+                      <div className="score-badge compact-score">
+                        <strong>{opportunity.finalScore}</strong>
+                        <span>{opportunity.scoreLabel}</span>
+                      </div>
+                      <span className="expand-cue">Details</span>
+                    </summary>
+
+                    <div className="opportunity-details">
+                      <p className="explanation">{opportunity.explanation}</p>
+
+                      <div className="evidence-summary">
+                        <div>
+                          <span>Sold</span>
+                          <strong>{opportunity.marketplaceEvidence.estimatedSoldCount}</strong>
+                        </div>
+                        <div>
+                          <span>Listings</span>
+                          <strong>{opportunity.marketplaceEvidence.activeListings}</strong>
+                        </div>
+                        <div>
+                          <span>Median</span>
+                          <strong>${Number(opportunity.marketplaceEvidence.medianPrice).toFixed(2)}</strong>
+                        </div>
+                      </div>
+
+                      <section className="score-breakdown" aria-label={`${opportunity.productConcept.name} score breakdown`}>
+                        <div className="breakdown-heading">
+                          <strong>Score Breakdown</strong>
+                          <span>Final {opportunity.finalScore}</span>
+                        </div>
+                        <div className="breakdown-grid">
+                          {([
+                            ["Marketplace proof", opportunity.marketplaceProofScore],
+                            ["Price viability", opportunity.priceViabilityScore],
+                            ["Freshness", opportunity.freshnessScore],
+                            ["Seller quality", opportunity.sellerQualityScore],
+                            ["Shipping risk", opportunity.shippingRiskScore],
+                            ["Competition risk", opportunity.competitionRiskScore]
+                          ] as Array<[string, number]>).map(([label, value]) => (
+                            <div className="breakdown-row" key={label}>
+                              <span>{label}</span>
+                              <div>
+                                <i style={{ width: `${value}%` }} />
+                              </div>
+                              <strong>{value}</strong>
                             </div>
-                            <strong>{value}</strong>
-                          </div>
+                          ))}
+                        </div>
+                      </section>
+
+                      <div className="risk-row" aria-label={`${opportunity.productConcept.name} risk signals`}>
+                        {opportunity.risks.map((risk) => (
+                          <span className={`risk-badge ${risk.severity.toLowerCase()}`} key={risk.type}>
+                            {risk.severity}: {risk.type.replaceAll("_", " ")}
+                          </span>
                         ))}
                       </div>
-                    </section>
-
-                    <div className="risk-row" aria-label={`${opportunity.productConcept.name} risk signals`}>
-                      {opportunity.risks.map((risk) => (
-                        <span className={`risk-badge ${risk.severity.toLowerCase()}`} key={risk.type}>
-                          {risk.severity}: {risk.type.replaceAll("_", " ")}
-                        </span>
-                      ))}
                     </div>
-                  </article>
+                  </details>
                 ))}
               </div>
             </article>

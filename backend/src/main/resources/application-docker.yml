@@ -13,3 +13,6 @@ spring:
 trendradar:
   ebay:
     enabled: ${TREND_RADAR_EBAY_ENABLED:false}
+  scheduler:
+    enabled: ${TREND_RADAR_SCHEDULER_ENABLED:false}
+    fixed-rate-minutes: ${TREND_RADAR_SCHEDULER_FIXED_RATE_MINUTES:360}
